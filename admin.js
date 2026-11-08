@@ -68,7 +68,8 @@ const VIEWS=[
  ["impor","Impor Excel",()=>can("anggota","ubah")&&can("simpanan","ubah"),()=>{}],
  ["pengguna","Pengguna",()=>me.master,()=>{resetForm();loadUsers()}],
  ["log","Log",()=>can("log","lihat"),()=>loadLog()]];
-async function show(t){VIEWS.forEach(v=>$("#"+v[0]).classList.toggle("hide",v[0]!==t));
+async function show(t){if(!window.__sk&&(can("simpanan","ubah")||can("anggota","ubah"))){window.__sk=1;cekSinkron()}
+VIEWS.forEach(v=>$("#"+v[0]).classList.toggle("hide",v[0]!==t));
  document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.t===t));
  document.querySelectorAll(".loaderr").forEach(e=>e.remove());
  try{await Promise.all([muatTB().catch(()=>{}),muatKode().catch(()=>{})]);await VIEWS.find(v=>v[0]===t)[3]()}catch(e){console.error(e);$("#"+t).insertAdjacentHTML("afterbegin",`<div class="msg err loaderr">Gagal memuat: ${esc(e.message)}</div>`)}}
@@ -312,7 +313,7 @@ $("#h_slip").onclick=()=>{const th=thSHU(),a=document.createElement("a");a.href=
 async function syncSemua(){await getAnggota(true);await muatTB().catch(()=>{});const W={};const s=await getDocs(collection(db,"simpanan")),t={};s.forEach(d=>{const x=d.data();(W[x.anggotaId]??=[]).push(x);(t[x.anggotaId]??={pokok:0,wajib:0,sukarela:0})[x.jenis]+=x.jumlah});
  const aktif=ANG.filter(a=>a.status!=="berhenti"),g={pokok:0,wajib:0,sukarela:0};
  for(let i=0;i<aktif.length;i+=400){const b=writeBatch(db);aktif.slice(i,i+400).forEach(a=>{const x=t[a.id]||{pokok:0,wajib:0,sukarela:0};for(const k in g)g[k]+=x[k];b.set(doc(db,"publik_anggota",a.id),{no:a.no,nama:a.nama,instansi:a.instansi||"",...x,total:x.pokok+x.wajib+x.sukarela,...pubW(a,W[a.id]||[])},{merge:true})});await b.commit()}
- await setDoc(doc(db,"publik_ringkasan","utama"),{jumlahAnggota:aktif.length,...g,tahunDibagi:Object.keys(TBD).filter(y=>TBD[y].dibagi).map(Number),diperbarui:new Date().toISOString()},{merge:true})}
+ await setDoc(doc(db,"publik_ringkasan","utama"),{jumlahAnggota:aktif.length,...g,tahunDibagi:Object.keys(TBD).filter(y=>TBD[y].dibagi).map(Number),versiWajib:1,diperbarui:new Date().toISOString()},{merge:true})}
 $("#h_bagi").onclick=async()=>{const th=thSHU(),m=$("#h_msg");
  try{const lama=await getDoc(doc(db,"shu",String(th)));await muatTB();
   if(!TBD[th])return msg(m,`Tutup tahun buku ${th} dulu di menu Tutup buku.`,true);if(!lama.exists())return msg(m,"Simpan perhitungan SHU dulu.",true);if(lama.data().dibagi)return msg(m,"SHU tahun ini sudah dibagikan.",true);
@@ -481,3 +482,4 @@ $("#h_peng").onclick=e=>{const b=e.target.closest("[data-pslip]");if(!b)return;c
 $("#t_cards").insertAdjacentHTML("beforebegin",'<div class="row noprint"><button class="btn ghost" id="t_pub">Perbarui data portal anggota (rekap wajib bulanan & tunggakan)</button></div><div id="t_pubmsg" class="msg hide"></div>');
 $("#t_pub").classList.toggle("hide",false);
 $("#t_pub").onclick=async()=>{const m=$("#t_pubmsg");if(!(can("simpanan","ubah")||can("anggota","ubah")))return msg(m,"Butuh hak ubah Simpanan atau Anggota.",true);msg(m,"Memperbarui…");try{await syncSemua();msg(m,"Data portal anggota diperbarui.")}catch(e){msg(m,"Gagal: "+e.message,true)}};
+async function cekSinkron(){try{const d=await getDoc(doc(db,"publik_ringkasan","utama"));if(d.data()?.versiWajib===1)return;await syncSemua()}catch(e){console.error(e)}}
