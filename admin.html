@@ -5,7 +5,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Public+Sans:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="app.css"></head><body>
 <header class="top"><div style="max-width:1080px;margin:0 auto"><h1>Ruang kerja pengurus</h1><p id="who">Masuk untuk mengelola data koperasi.</p>
-<nav id="nav" class="hide" role="tablist"><button role="tab" data-t="ringkasan" aria-selected="true">Ringkasan</button><button role="tab" data-t="anggota" aria-selected="false">Anggota</button><button role="tab" data-t="impor" aria-selected="false">Impor Excel</button><button id="out" role="tab" aria-selected="false">Keluar</button></nav></div></header>
+<nav id="nav" class="hide" role="tablist"><button role="tab" data-t="ringkasan" aria-selected="true">Ringkasan</button><button role="tab" data-t="anggota" aria-selected="false">Anggota</button><button role="tab" data-t="impor" aria-selected="false">Impor Excel</button><button role="tab" data-t="pengguna" aria-selected="false">Pengguna</button><button id="out" role="tab" aria-selected="false">Keluar</button></nav></div></header>
 <main>
 <section id="login" class="panel" style="max-width:460px"><h2>Masuk</h2>
 <label for="em">Email</label><input id="em" type="email" autocomplete="username">
@@ -15,7 +15,20 @@
 <section id="anggota" class="hide"><div class="panel scroll"><table><thead><tr><th class="n">No</th><th>Nama</th><th>Instansi</th><th>Tgl daftar</th><th>Status</th></tr></thead><tbody id="ab"></tbody></table></div></section>
 <section id="impor" class="hide"><div class="panel"><h2>Impor dari LAPORAN PEMBUKUAN KOPERASI PGRI.xlsx</h2>
 <p>Membaca sheet <b>SIMPANAN ANGGOTA</b>. Impor ulang aman: data dengan nomor yang sama diperbarui, bukan digandakan.</p>
-<input type="file" id="f" accept=".xlsx"><div class="row" style="margin-top:12px"><button class="btn" id="imp" disabled>Impor sekarang</button></div><div id="imsg" class="msg hide"></div></div></section>
+<input type="file" id="f" accept=".xlsx"><div class="row" style="margin-top:12px"><button class="btn" id="imp">Impor sekarang</button></div><div id="imsg" class="msg hide"></div></div></section>
+<section id="pengguna" class="hide">
+<div class="panel"><h2 id="ftitle">Tambah akun</h2>
+<label for="u_nama">Nama</label><input id="u_nama">
+<label for="u_jab">Jabatan</label><select id="u_jab"><option value="ketua">Ketua</option><option value="sekretaris">Sekretaris</option><option value="bendahara">Bendahara</option><option value="pengawas">Pengawas</option><option value="lainnya">Lainnya</option></select>
+<label for="u_email">Email</label><input id="u_email" type="email">
+<div id="pwwrap"><label for="u_pw">Kata sandi awal (minimal 12 karakter, ada huruf besar, kecil, dan angka)</label><input id="u_pw" type="password" autocomplete="new-password"></div>
+<label>Hak akses</label><div class="scroll"><table id="izin"></table></div>
+<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="u_aktif" checked style="width:auto"> Akun aktif</label>
+<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="u_master" style="width:auto"> Jadikan master admin (boleh mengatur akun dan memiliki semua hak akses)</label>
+<div class="row" style="margin-top:14px"><button class="btn" id="u_save">Simpan akun</button><button class="btn ghost" id="u_reset">Batal</button><button class="btn ghost hide" id="u_mail">Kirim email atur ulang kata sandi</button></div>
+<div id="u_msg" class="msg hide"></div></div>
+<div class="panel scroll"><h2 style="margin-bottom:10px">Daftar akun</h2><table><thead><tr><th>Nama</th><th>Jabatan</th><th>Email</th><th>Status</th><th>Hak akses</th><th></th></tr></thead><tbody id="ub"></tbody></table></div>
+</section>
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script type="module" src="admin.js"></script></body></html>
