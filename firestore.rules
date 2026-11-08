@@ -1,23 +1,34 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{db}/documents {
-    function isAdmin() { return request.auth != null && exists(/databases/$(db)/documents/admins/$(request.auth.uid)); }
-    function role() { return get(/databases/$(db)/documents/admins/$(request.auth.uid)).data.role; }
-    function isStaff() { return isAdmin() && role() in ['bendahara','sekretaris']; }
+    function adm() { return get(/databases/$(db)/documents/admins/$(request.auth.uid)).data; }
+    function isAdmin() { return request.auth != null && exists(/databases/$(db)/documents/admins/$(request.auth.uid)) && adm().get('aktif', true) == true; }
+    function isMaster() { return isAdmin() && adm().get('master', false) == true; }
+    function can(mod, kind) { return isAdmin() && (isMaster() || mod in adm().get(kind, [])); }
 
-    // Portal publik: hanya data ringkas, bukan KTP/rekening/HP
-    match /{col}/{id} {
-      allow read: if col in ['publik_anggota','publik_pengurus','publik_ringkasan'];
-      allow write: if col in ['publik_anggota','publik_pengurus','publik_ringkasan'] && isStaff();
-    }
-    // Data tertutup: baca oleh semua pengurus/pengawas, tulis oleh sekretaris & bendahara
-    match /{col}/{id} {
-      allow read: if isAdmin() && col in ['anggota','simpanan','bku','surat','config','log'];
-      allow write: if isStaff() && col in ['anggota','simpanan','bku','surat','config','log'];
+    function tglOf(d) { return d.get('tanggal', d.get('periode', '')); }
+    function tb(t) { return t is string && t.size() >= 4 && exists(/databases/$(db)/documents/tahunbuku/$(t[0:4])); }
+    match /tahunbuku/{id} { allow read: if isAdmin(); allow create, delete: if can('tutup','ubah'); allow update: if can('tutup','ubah') || can('shu','ubah'); }
+    match /kode_bku/{id} { allow read: if can('bku','lihat'); allow write: if can('bku','ubah'); }
+    match /publik_anggota/{id}   { allow read: if true; allow write: if can('simpanan','ubah') || can('anggota','ubah'); }
+    match /publik_ringkasan/{id} { allow read: if true; allow write: if can('simpanan','ubah') || can('anggota','ubah'); }
+    match /publik_pengurus/{id}  { allow read: if true; allow write: if can('anggota','ubah'); }
+
+    match /anggota/{id}  { allow read: if can('anggota','lihat');  allow write: if can('anggota','ubah'); }
+    match /simpanan/{id} { allow read: if can('simpanan','lihat'); allow create, update: if can('simpanan','ubah') && !tb(tglOf(request.resource.data)) && (resource == null || !tb(tglOf(resource.data))); allow delete: if can('simpanan','ubah') && (!tb(tglOf(resource.data)) || can('shu','ubah')); }
+    match /bku/{id}      { allow read: if can('bku','lihat'); allow create, update: if can('bku','ubah') && !tb(request.resource.data.get('tanggal','')) && (resource == null || !tb(resource.data.get('tanggal',''))); allow delete: if can('bku','ubah') && !tb(resource.data.get('tanggal','')); }
+    match /surat/{id}    { allow read: if can('surat','lihat');    allow write: if can('surat','ubah'); }
+    match /shu/{id}      { allow read: if can('shu','lihat');      allow write: if can('shu','ubah'); }
+    match /config/{id}   { allow read: if isAdmin();               allow write: if isMaster(); }
+
+    match /log/{id} {
+      allow read: if can('log','lihat');
+      allow create: if isAdmin() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
     }
     match /admins/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-      allow write: if false; // dibuat manual lewat Firebase Console
+      allow read: if request.auth != null && (request.auth.uid == uid || isMaster());
+      allow write: if isMaster();
     }
   }
 }

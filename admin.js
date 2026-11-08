@@ -10,9 +10,9 @@ const today=()=>ymd(new Date());
 const msg=(el,t,err)=>{el.textContent=t;el.classList.remove("hide");el.classList.toggle("err",!!err)};
 const unduh=(rows,nama)=>{const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),"Data");XLSX.writeFile(wb,nama)};
 const clean=o=>JSON.parse(JSON.stringify(o??null));
-const MOD=[["anggota","Anggota"],["simpanan","Simpanan"],["bku","Buku kas (BKU)"],["surat","Surat masuk/keluar"],["shu","SHU"],["log","Log & riwayat"]];
+const MOD=[["anggota","Anggota"],["simpanan","Simpanan"],["bku","Buku kas (BKU)"],["surat","Surat masuk/keluar"],["shu","SHU"],["tutup","Tutup tahun buku"],["log","Log & riwayat"]];
 const LBL=Object.fromEntries(MOD);
-const KODE=["SIM","BIA","CAFE","KONVEKSI"];
+const KODE=["SIM","BIA","CAFE","KONVEKSI","PINJ","SHU"],TIPE={SIM:"simpanan",BIA:"umum",CAFE:"usaha",KONVEKSI:"usaha",PINJ:"piutang",SHU:"dist_shu"},KLBL={SIM:"simpanan",BIA:"biaya lain-lain",CAFE:"kas cafe",KONVEKSI:"kas konveksi",PINJ:"peminjaman dana (piutang)",SHU:"pembagian SHU"};
 const BLN=["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
 const BLNF=["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
 const WAJIB=50000;
@@ -51,7 +51,7 @@ function tanya({judul,fields,nilai={},validasi,alasan=true,tombol="Simpan"}){ret
  $("#dlg_x").onclick=()=>{res(null);d.close()};d.onclose=()=>res(null);d.showModal()})}
 const btn=(a,id,l,k="")=>`<button class="btn ghost sm" data-a="${a}" data-id="${esc(id)}" data-k="${k}">${l}</button>`;
 const rwBtn=(k,id)=>can("log","lihat")?btn("rw",id,"Riwayat",k):"";
-const aksi=(sel,map)=>{$(sel).onclick=async e=>{const b=e.target.closest("button[data-a]");if(!b)return;b.disabled=true;try{await map[b.dataset.a](b.dataset.id,b)}catch(err){console.error(err);alert("Gagal: "+err.message)}b.disabled=false}};
+const aksi=(sel,map)=>{$(sel).onclick=async e=>{const b=e.target.closest("button[data-a]");if(!b)return;b.disabled=true;try{await map[b.dataset.a](b.dataset.id,b)}catch(err){console.error(err);alert(err.code==="permission-denied"?"Ditolak. Kemungkinan tahun buku transaksi ini sudah ditutup, atau hak akses Anda tidak cukup.":"Gagal: "+err.message)}b.disabled=false}};
 const rw=(id,b)=>riwayat(b.dataset.k,id);
 
 // ---------- Navigasi ----------
@@ -63,6 +63,7 @@ const VIEWS=[
  ["bku","Buku kas",()=>can("bku","lihat"),()=>loadBku()],
  ["laporan","Laporan",()=>can("bku","lihat")&&can("simpanan","lihat")&&can("anggota","lihat"),()=>loadLaporan()],
  ["surat","Surat",()=>can("surat","lihat"),()=>loadSurat()],
+ ["tutup","Tutup buku",()=>can("tutup","lihat")&&can("bku","lihat")&&can("simpanan","lihat"),()=>loadTutup()],
  ["shu","SHU",()=>can("shu","lihat")&&can("anggota","lihat")&&can("simpanan","lihat"),()=>loadShu()],
  ["impor","Impor Excel",()=>can("anggota","ubah")&&can("simpanan","ubah"),()=>{}],
  ["pengguna","Pengguna",()=>me.master,()=>{resetForm();loadUsers()}],
@@ -70,7 +71,7 @@ const VIEWS=[
 async function show(t){VIEWS.forEach(v=>$("#"+v[0]).classList.toggle("hide",v[0]!==t));
  document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.t===t));
  document.querySelectorAll(".loaderr").forEach(e=>e.remove());
- try{await VIEWS.find(v=>v[0]===t)[3]()}catch(e){console.error(e);$("#"+t).insertAdjacentHTML("afterbegin",`<div class="msg err loaderr">Gagal memuat: ${esc(e.message)}</div>`)}}
+ try{await Promise.all([muatTB().catch(()=>{}),muatKode().catch(()=>{})]);await VIEWS.find(v=>v[0]===t)[3]()}catch(e){console.error(e);$("#"+t).insertAdjacentHTML("afterbegin",`<div class="msg err loaderr">Gagal memuat: ${esc(e.message)}</div>`)}}
 $("#tabs").onclick=e=>{const b=e.target.closest("button[data-t]");if(b)show(b.dataset.t)};
 $("#out").onclick=()=>signOut(auth);
 $("#go").onclick=async()=>{$("#lmsg").classList.add("hide");
@@ -97,7 +98,7 @@ async function syncPublik(id){const a=(await getAnggota()).find(x=>x.id===id);if
  await syncRingkasan()}
 
 // ---------- Tunggakan (dipakai juga oleh Ringkasan) ----------
-function hitungTunggakan(ang,sim,tahun,jt){const n=new Date();let due=tahun<n.getFullYear()?12:tahun>n.getFullYear()?0:n.getMonth()+(n.getDate()>=jt?1:0);
+function hitungTunggakan(ang,sim,tahun,jt){const n=new Date();let due=TBD[tahun]?.dibagi?0:tahun<n.getFullYear()?12:tahun>n.getFullYear()?0:n.getMonth()+(n.getDate()>=jt?1:0);
  const paid={};sim.forEach(x=>{if(x.jenis==="wajib"&&x.periode&&x.periode.startsWith(tahun+"-"))(paid[x.anggotaId]??=new Set()).add(+x.periode.slice(5,7))});
  return ang.filter(a=>a.status!=="berhenti").map(a=>{const ty=a.tglDaftar?+a.tglDaftar.slice(0,4):0,mulai=ty>tahun?13:ty===tahun?+a.tglDaftar.slice(5,7):1,cells=[],tung=[];
   for(let m=1;m<=12;m++){if(paid[a.id]?.has(m))cells.push("bayar");else if(m<mulai||m>due)cells.push("-");else{cells.push("tunggak");tung.push(m)}}
@@ -153,20 +154,21 @@ function renderSim(){const q=$("#s_cari").value.toLowerCase(),t={};SIM.forEach(x
  $("#s_xls").onclick=()=>unduh(r.map(x=>({No:x.a.no,Nama:x.a.nama,Instansi:x.a.instansi,Pokok:x.pokok,Wajib:x.wajib,Sukarela:x.sukarela,Total:x.tot})),"simpanan-anggota.xlsx");renderSetoran()}
 function renderSetoran(){const f=$("#s_fa").value,e=can("simpanan","ubah")&&can("bku","ubah"),nm=Object.fromEntries(ANG.map(a=>[a.id,a.nama]));
  const r=SIM.filter(x=>!f||x.anggotaId===f).sort((a,b)=>(b.tanggal||"").localeCompare(a.tanggal||"")).slice(0,300);
- $("#sh").innerHTML=r.map(x=>`<tr><td>${esc(x.tanggal||"")}</td><td>${esc(nm[x.anggotaId]||x.anggotaId)}</td><td>${esc(x.jenis)}</td><td>${esc(x.periode||"")}</td><td class="n">${rp(x.jumlah)}</td><td>${e?btn("ubah",x.id,"Ubah")+" "+btn("hapus",x.id,"Hapus"):""} ${rwBtn("simpanan",x.id)}</td></tr>`).join("")||`<tr><td colspan="6">Belum ada setoran.</td></tr>`}
+ $("#sh").innerHTML=r.map(x=>`<tr><td>${esc(x.tanggal||"")}</td><td>${esc(nm[x.anggotaId]||x.anggotaId)}</td><td>${esc(x.tarik?"tarik sukarela":x.jenis)}</td><td>${esc(x.periode||"")}</td><td class="n">${rp(x.jumlah)}</td><td>${e?(x.tarik?"":btn("ubah",x.id,"Ubah")+" ")+btn("hapus",x.id,"Hapus"):""} ${rwBtn("simpanan",x.id)}</td></tr>`).join("")||`<tr><td colspan="6">Belum ada setoran.</td></tr>`}
 $("#s_cari").oninput=renderSim;$("#s_fa").onchange=renderSetoran;
 $("#s_jenis").onchange=()=>{const j=$("#s_jenis").value;$("#s_perwrap").classList.toggle("hide",j!=="wajib");$("#s_jml").value=j==="pokok"?500000:j==="wajib"?50000:""};
 const cekSukarela=j=>j>15000000?"Simpanan sukarela maksimal Rp15.000.000 per anggota (AD Pasal 34).":"";
 $("#s_save").onclick=async()=>{const m=$("#s_msg"),id=$("#s_ang").value,jenis=$("#s_jenis").value,jml=+$("#s_jml").value,tgl=$("#s_tgl").value,per=$("#s_per").value;
  if(!id||!(jml>0)||!tgl){msg(m,"Lengkapi anggota, jumlah, dan tanggal.",true);return}
  if(jenis==="wajib"&&!per){msg(m,"Pilih bulan untuk simpanan wajib.",true);return}
- if(jenis==="sukarela"&&cekSukarela(jml)){msg(m,cekSukarela(jml),true);return}
- const sid=jenis==="pokok"?id+"_pokok":jenis==="sukarela"?id+"_sukarela":`${id}_wajib_${per.slice(0,4)}_${per.slice(5,7)}`;
+ if(tertutup(tgl)){msg(m,`Tahun buku ${tgl.slice(0,4)} sudah ditutup.`,true);return}
+ if(jenis==="sukarela"||jenis==="tarik"){const sal=SIM.filter(x=>x.anggotaId===id&&x.jenis==="sukarela").reduce((t,x)=>t+x.jumlah,0),e=jenis==="tarik"?(jml>sal?`Penarikan melebihi saldo sukarela (${rp(sal)}).`:""):(sal+jml>15000000?"Simpanan sukarela maksimal Rp15.000.000 per anggota (AD Pasal 34).":"");if(e){msg(m,e,true);return}}
+ const sid=jenis==="pokok"?id+"_pokok":jenis==="sukarela"||jenis==="tarik"?`${id}_${jenis}_${Date.now()}`:`${id}_wajib_${per.slice(0,4)}_${per.slice(5,7)}`;
  if(SIM.some(x=>x.id===sid)){msg(m,"Setoran jenis dan bulan ini untuk anggota tersebut sudah tercatat. Gunakan tombol Ubah pada Daftar setoran.",true);return}
  $("#s_save").disabled=true;
- try{const a=ANG.find(x=>x.id===id),data={anggotaId:id,jenis,jumlah:jml,tanggal:tgl};if(jenis==="wajib")data.periode=per;
+ try{const a=ANG.find(x=>x.id===id),tarik=jenis==="tarik",J=tarik?"sukarela":jenis,data={anggotaId:id,jenis:J,jumlah:tarik?-jml:jml,tanggal:tgl};if(tarik)data.tarik=true;if(jenis==="wajib")data.periode=per;
   const b=writeBatch(db);b.set(doc(db,"simpanan",sid),data);
-  b.set(doc(db,"bku","sim_"+sid),{tanggal:tgl,kode:"SIM",keterangan:`Simpanan ${jenis}${jenis==="wajib"?" "+per:""} an: ${a.nama}`,kredit:jml,debit:0,ref:sid,anggotaId:id,jenis,urut:Date.now()});
+  b.set(doc(db,"bku","sim_"+sid),{tanggal:tgl,kode:"SIM",keterangan:tarik?`Penarikan simpanan sukarela an: ${a.nama}`:`Simpanan ${jenis}${jenis==="wajib"?" "+per:""} an: ${a.nama}`,kredit:tarik?0:jml,debit:tarik?jml:0,ref:sid,anggotaId:id,jenis:J,urut:Date.now()});
   logOp(b,{aksi:"tambah",kol:"simpanan",id:sid,sesudah:data,detail:`${a.nama}: ${jenis}`});await b.commit();await syncPublik(id);
   const s=await getDocs(collection(db,"simpanan"));SIM=s.docs.map(d=>({id:d.id,...d.data()}));renderSim();msg(m,`Setoran ${jenis} ${a.nama} sebesar ${rp(jml)} tersimpan dan masuk ke buku kas.`)}
  catch(e){msg(m,"Gagal menyimpan: "+e.message,true)}
@@ -202,15 +204,16 @@ function renderBku(){const f=$("#b_fk").value,e=can("bku","ubah");let sal=0,m=0,
 $("#b_fk").onchange=renderBku;$("#b_lk").onchange=renderBku;
 $("#b_save").onclick=async()=>{const m=$("#b_msg"),jml=+$("#b_jml").value,ket=$("#b_ket").value.trim(),tgl=$("#b_tgl").value;
  if(!(jml>0)||!ket||!tgl){msg(m,"Lengkapi tanggal, keterangan, dan jumlah.",true);return}
- try{const masuk=$("#b_arah").value==="masuk",data={tanggal:tgl,kode:$("#b_kode").value,keterangan:ket,kredit:masuk?jml:0,debit:masuk?0:jml,noBukti:$("#b_bukti").value.trim(),akun:$("#b_akun").value,urut:Date.now()},ref=doc(collection(db,"bku")),b=writeBatch(db);
-  b.set(ref,data);logOp(b,{aksi:"tambah",kol:"bku",id:ref.id,sesudah:data,detail:ket});await b.commit();$("#b_jml").value="";$("#b_ket").value="";$("#b_bukti").value="";await loadBku();msg(m,"Transaksi tersimpan.")}
+ if(tertutup(tgl)){msg(m,`Tahun buku ${tgl.slice(0,4)} sudah ditutup.`,true);return}
+ try{const masuk=$("#b_arah").value==="masuk",data={tanggal:tgl,kode:$("#b_kode").value,keterangan:ket,kredit:masuk?jml:0,debit:masuk?0:jml,noBukti:$("#b_bukti").value.trim(),pihak:$("#b_pihak").value.trim(),akun:$("#b_akun").value,urut:Date.now()},ref=doc(collection(db,"bku")),b=writeBatch(db);
+  b.set(ref,data);logOp(b,{aksi:"tambah",kol:"bku",id:ref.id,sesudah:data,detail:ket});await b.commit();$("#b_jml").value="";$("#b_ket").value="";$("#b_bukti").value="";$("#b_pihak").value="";await loadBku();msg(m,"Transaksi tersimpan.")}
  catch(e){msg(m,"Gagal menyimpan: "+e.message,true)}};
 aksi("#bb",{rw,
  ubah:async id=>{const x=BKU.find(y=>y.id===id),kunci=!!(x.ref||x.konfirmasi?.mode==="catat");
   const ekstra=(!x.kode||!KODE.includes(x.kode))?[[x.kode||"",x.kode||"(tanpa kode)"]]:[];
-  const v=await tanya({judul:"Ubah transaksi kas",fields:[{type:"note",label:kunci?"Transaksi ini terhubung ke data simpanan: kode, arah, jumlah, dan kategori dikunci (tanggal, keterangan, dan no. bukti tetap bisa dilengkapi). Ubah lewat menu Simpanan atau batalkan konfirmasi.":"Ubah isian yang keliru."},{k:"tanggal",label:"Tanggal",type:"date",req:1},{k:"kode",label:"Kode",type:"select",opt:[...ekstra,...KODE.map(c=>[c,c])],dis:kunci},{k:"arah",label:"Arah",type:"select",opt:[["masuk","Uang masuk (kredit)"],["keluar","Uang keluar (debit)"]],dis:kunci},{k:"jumlah",label:"Jumlah (Rp)",type:"number",req:1,dis:kunci},{k:"keterangan",label:"Keterangan",req:1},{k:"noBukti",label:"No. bukti / kuitansi"},{k:"akun",label:"Kategori laporan keuangan",type:"select",opt:AKUN.map(([v,l])=>[v,l]),dis:kunci}],
-   nilai:{noBukti:x.noBukti||"",akun:x.akun||"",tanggal:x.tanggal,kode:x.kode||"",arah:x.kredit?"masuk":"keluar",jumlah:x.kredit||x.debit||0,keterangan:x.keterangan},validasi:o=>o.jumlah>0?"":"Jumlah harus lebih dari 0."});if(!v)return;
-  const sebelum={tanggal:x.tanggal||"",kode:x.kode||"",keterangan:x.keterangan||"",kredit:x.kredit||0,debit:x.debit||0,noBukti:x.noBukti||"",akun:x.akun||""},sesudah={tanggal:v.tanggal,kode:v.kode,keterangan:v.keterangan,noBukti:v.noBukti,akun:kunci?(x.akun||""):v.akun,kredit:v.arah==="masuk"?v.jumlah:0,debit:v.arah==="keluar"?v.jumlah:0};
+  const v=await tanya({judul:"Ubah transaksi kas",fields:[{type:"note",label:kunci?"Transaksi ini terhubung ke data simpanan: kode, arah, jumlah, dan kategori dikunci (tanggal, keterangan, dan no. bukti tetap bisa dilengkapi). Ubah lewat menu Simpanan atau batalkan konfirmasi.":"Ubah isian yang keliru."},{k:"tanggal",label:"Tanggal",type:"date",req:1},{k:"kode",label:"Kode",type:"select",opt:[...ekstra,...KODE.map(c=>[c,c])],dis:kunci},{k:"arah",label:"Arah",type:"select",opt:[["masuk","Uang masuk (kredit)"],["keluar","Uang keluar (debit)"]],dis:kunci},{k:"jumlah",label:"Jumlah (Rp)",type:"number",req:1,dis:kunci},{k:"keterangan",label:"Keterangan",req:1},{k:"noBukti",label:"No. bukti / kuitansi"},{k:"pihak",label:"Peminjam / pihak (piutang, utang)"},{k:"akun",label:"Kategori laporan keuangan",type:"select",opt:AKUN.map(([v,l])=>[v,l]),dis:kunci}],
+   nilai:{noBukti:x.noBukti||"",pihak:x.pihak||"",akun:x.akun||"",tanggal:x.tanggal,kode:x.kode||"",arah:x.kredit?"masuk":"keluar",jumlah:x.kredit||x.debit||0,keterangan:x.keterangan},validasi:o=>o.jumlah>0?"":"Jumlah harus lebih dari 0."});if(!v)return;
+  const sebelum={tanggal:x.tanggal||"",kode:x.kode||"",keterangan:x.keterangan||"",kredit:x.kredit||0,debit:x.debit||0,noBukti:x.noBukti||"",pihak:x.pihak||"",akun:x.akun||""},sesudah={tanggal:v.tanggal,kode:v.kode,keterangan:v.keterangan,noBukti:v.noBukti,pihak:v.pihak,akun:kunci?(x.akun||""):v.akun,kredit:v.arah==="masuk"?v.jumlah:0,debit:v.arah==="keluar"?v.jumlah:0};
   if(JSON.stringify(sebelum)===JSON.stringify(sesudah))return alert("Tidak ada yang diubah.");
   const upd={...sesudah};if(x.konfirmasi&&sesudah.kode!=="SIM")upd.konfirmasi=deleteField();
   const b=writeBatch(db);b.set(doc(db,"bku",id),upd,{merge:true});logOp(b,{aksi:"ubah",kol:"bku",id,sebelum,sesudah,alasan:v.alasan,detail:v.keterangan});await b.commit();await loadBku()},
@@ -266,34 +269,61 @@ aksi("#rb",{rw,
 // ---------- SHU ----------
 const SHU_PCT={cadangan:40,pendidikan:5,pengurus:10,anggota:20,transaksi:15,sukarela:10};
 const PENERIMA=["Marsono (Ketua)","Ika Novita Mulia (Sekretaris)","Eli Sutrisnaniati (Bendahara)","M. Romsyah (Koordinator Unit Usaha)","Hj. Mardiatul Idalisah (Ketua Pengawas)","Mustaring (Anggota Pengawas)","Dr. H. Saleh (Anggota Pengawas)"];
-async function loadShu(){const [ang,s]=await Promise.all([getAnggota(true),getDocs(collection(db,"simpanan"))]);
- const suk={};s.forEach(d=>{const x=d.data();if(x.jenis==="sukarela")suk[x.anggotaId]=(suk[x.anggotaId]||0)+x.jumlah});
- SHUROWS=ang.filter(a=>a.status!=="berhenti").map(a=>({id:a.id,nama:a.nama,suk:suk[a.id]||0,tx:0}));
+const thSHU=()=>+$("#h_thn").value,idn=n=>Math.round(n).toLocaleString("id-ID");
+function bobotSukarela(th){const m={},out={};SIM.filter(x=>x.jenis==="sukarela").forEach(x=>(m[x.anggotaId]??=[]).push([x.tanggal||"",x.jumlah]));
+ for(const [id,L] of Object.entries(m)){let w=0;for(let b=1;b<=12;b++){const e=`${th}-${String(b).padStart(2,"0")}-31`,sal=L.filter(([d])=>d<=e).reduce((t,[,j])=>t+j,0);if(sal>0)w+=sal}out[id]=w}return out}
+function dasarShu(){const th=thSHU(),w=bobotSukarela(th),suk={},wj={},old=Object.fromEntries(SHUROWS.map(r=>[r.id,r.tx]));
+ SIM.forEach(x=>{if(x.jenis==="sukarela")suk[x.anggotaId]=(suk[x.anggotaId]||0)+x.jumlah;if(x.jenis==="wajib"&&(x.periode||"").startsWith(th+"-"))wj[x.anggotaId]=(wj[x.anggotaId]||0)+x.jumlah});
+ SHUROWS=ANG.filter(a=>a.status!=="berhenti").map(a=>({id:a.id,nama:a.nama,instansi:a.instansi||"",suk:suk[a.id]||0,w:w[a.id]||0,wj:wj[a.id]||0,tx:old[a.id]||0}))}
+async function loadShu(){const [,s]=await Promise.all([getAnggota(true),getDocs(collection(db,"simpanan"))]);SIM=s.docs.map(d=>({id:d.id,...d.data()}));
  if(!$("#h_thn").value)$("#h_thn").value=new Date().getFullYear();if(!$("#h_pen").value)$("#h_pen").value=PENERIMA.join("\n");
- $("#h_save").classList.toggle("hide",!can("shu","ubah"));await muatShu();renderShu()}
-async function muatShu(){$("#h_msg").classList.add("hide");try{const d=await getDoc(doc(db,"shu",String($("#h_thn").value)));
- if(d.exists()){const x=d.data(),t=Object.fromEntries((x.hasil||[]).map(r=>[r.id,r.transaksi]));$("#h_laba").value=x.laba;$("#h_pen").value=(x.penerima||[]).join("\n");SHUROWS.forEach(r=>r.tx=t[r.id]||0);msg($("#h_msg"),`Memuat perhitungan yang tersimpan untuk tahun ${x.tahun}.`)}}catch(e){}}
-$("#h_thn").onchange=async()=>{await muatShu();renderShu()};
-function renderShu(){$("#hb").innerHTML=SHUROWS.map(r=>`<tr><td>${esc(r.nama)}</td><td class="n">${rp(r.suk)}</td><td class="n"><input type="number" min="0" class="tx" data-id="${esc(r.id)}" value="${r.tx||""}" style="width:150px;text-align:right" aria-label="Transaksi ${esc(r.nama)}"></td><td class="n" id="hs_${esc(r.id)}"></td><td class="n" id="ht_${esc(r.id)}"></td><td class="n" id="ha_${esc(r.id)}"></td><td class="n" id="hz_${esc(r.id)}"></td></tr>`).join("");hitungShu()}
+ $("#h_save").classList.toggle("hide",!can("shu","ubah"));$("#h_bagi").classList.toggle("hide",!(can("shu","ubah")&&can("bku","ubah")&&can("simpanan","ubah")));dasarShu();await muatShu();renderShu()}
+async function muatShu(){$("#h_msg").classList.add("hide");try{const d=await getDoc(doc(db,"shu",String(thSHU())));
+ if(d.exists()){const x=d.data(),h=Object.fromEntries((x.hasil||[]).map(r=>[r.id,r]));$("#h_laba").value=x.laba;$("#h_pen").value=(x.penerima||[]).join("\n");
+  SHUROWS.forEach(r=>{const q=h[r.id];r.tx=q?.transaksi||0;if(x.dibagi&&q){r.wj=q.wajib||0;r.w=q.bobot||0}});msg($("#h_msg"),`Memuat perhitungan tersimpan tahun ${x.tahun}${x.dibagi?" (sudah dibagikan "+x.tglBagi+")":""}.`)}}catch(e){}}
+$("#h_thn").onchange=async()=>{dasarShu();await muatShu();renderShu()};
+function renderShu(){$("#hb").innerHTML=SHUROWS.map(r=>`<tr><td>${esc(r.nama)}</td><td class="n">${rp(r.suk)}</td><td class="n">${idn(r.w)}</td><td class="n"><input type="number" min="0" class="tx" data-id="${esc(r.id)}" value="${r.tx||""}" style="width:130px;text-align:right" aria-label="Transaksi ${esc(r.nama)}"></td>${["hs","ht","ha","hz"].map(p=>`<td class="n" id="${p}_${esc(r.id)}"></td>`).join("")}<td class="n">${rp(r.wj)}</td><td class="n" id="hd_${esc(r.id)}"></td><td><button class="btn ghost sm" data-slip="${esc(r.id)}">Slip</button></td></tr>`).join("");hitungShu()}
 $("#hb").oninput=e=>{if(!e.target.classList.contains("tx"))return;const r=SHUROWS.find(x=>x.id===e.target.dataset.id);if(r)r.tx=+e.target.value||0;hitungShu()};
 $("#h_laba").oninput=()=>hitungShu();$("#h_pen").oninput=()=>hitungShu();
-function hitungShu(){const L=+$("#h_laba").value||0,pen=$("#h_pen").value.split("\n").map(s=>s.trim()).filter(Boolean);
- const P=Object.fromEntries(Object.entries(SHU_PCT).map(([k,v])=>[k,Math.round(L*v/100)]));
- const tS=SHUROWS.reduce((s,r)=>s+r.suk,0),tT=SHUROWS.reduce((s,r)=>s+r.tx,0),n=SHUROWS.length;
- SHUROWS.forEach(r=>{r.hs=tS?P.sukarela*r.suk/tS:0;r.ht=tT?P.transaksi*r.tx/tT:0;r.ha=n?P.anggota/n:0;r.z=r.hs+r.ht+r.ha;
-  for(const [p,k] of [["hs","hs"],["ht","ht"],["ha","ha"],["hz","z"]]){const c=$(`#${p}_${r.id}`);if(c)c.textContent=rp(r[k])}});
+function hitungShu(){const th=thSHU(),L=+$("#h_laba").value||0,pen=$("#h_pen").value.split("\n").map(s=>s.trim()).filter(Boolean);
+ const P=Object.fromEntries(Object.entries(SHU_PCT).map(([k,v])=>[k,Math.round(L*v/100)])),sm=k=>SHUROWS.reduce((t,r)=>t+r[k],0),tW=sm("w"),tT=sm("tx"),n=SHUROWS.length;
+ SHUROWS.forEach(r=>{r.hs=tW?P.sukarela*r.w/tW:0;r.ht=tT?P.transaksi*r.tx/tT:0;r.ha=n?P.anggota/n:0;r.z=r.hs+r.ht+r.ha;r.d=r.z+r.wj;
+  for(const [p,k] of [["hs","hs"],["ht","ht"],["ha","ha"],["hz","z"],["hd","d"]]){const c=$(`#${p}_${r.id}`);if(c)c.textContent=rp(r[k])}});
  const each=pen.length?P.pengurus/pen.length:0;
  $("#h_cards").innerHTML=[["Kas cadangan koperasi ("+SHU_PCT.cadangan+"%)",P.cadangan],["Dana pendidikan & sosial ("+SHU_PCT.pendidikan+"%)",P.pendidikan],["Pengurus & pengawas ("+SHU_PCT.pengurus+"%)",P.pengurus],["SHU anggota ("+SHU_PCT.anggota+"%)",P.anggota],["SHU transaksi anggota ("+SHU_PCT.transaksi+"%)",P.transaksi],["SHU simpanan sukarela ("+SHU_PCT.sukarela+"%)",P.sukarela],["Per penerima pengurus/pengawas",each]].map(([l,v])=>`<div class="stat"><b>${rp(v)}</b><span>${l}</span></div>`).join("");
- const w=[];if(L>0&&!tS)w.push("Belum ada simpanan sukarela, jadi bagian 10% belum bisa dibagikan.");if(L>0&&!tT)w.push("Isi kolom transaksi anggota agar bagian 15% bisa dibagikan.");if(L>0&&!pen.length)w.push("Isi penerima bagian pengurus & pengawas.");
- $("#h_note").innerHTML=w.map(t=>`<div class="msg err">${t}</div>`).join("");
- const s=k=>SHUROWS.reduce((a,r)=>a+r[k],0);$("#hf").innerHTML=`<tr><td>Jumlah</td><td class="n">${rp(tS)}</td><td class="n">${rp(tT)}</td><td class="n">${rp(s("hs"))}</td><td class="n">${rp(s("ht"))}</td><td class="n">${rp(s("ha"))}</td><td class="n">${rp(s("z"))}</td></tr>`;
- $("#h_xls").onclick=()=>unduh(SHUROWS.map(r=>({Anggota:r.nama,"Simpanan sukarela":r.suk,Transaksi:r.tx,"SHU sukarela":Math.round(r.hs),"SHU transaksi":Math.round(r.ht),"SHU anggota":Math.round(r.ha),Total:Math.round(r.z)})),`SHU-${$("#h_thn").value}.xlsx`)}
-$("#h_save").onclick=async()=>{const m=$("#h_msg"),L=+$("#h_laba").value,thn=String($("#h_thn").value),pen=$("#h_pen").value.split("\n").map(s=>s.trim()).filter(Boolean);
+ const st=TBD[th],w=[st?(st.dibagi?`SHU tahun buku ${th} sudah dibagikan pada ${st.tglBagi}.`:`Tahun buku ${th} sudah ditutup. Setelah laba dipastikan, simpan perhitungan lalu bagikan.`):`Tahun buku ${th} belum ditutup. Tutup buku dulu di menu Tutup buku sebelum membagikan.`];
+ if(L>0&&!tW)w.push("Belum ada simpanan sukarela pada tahun ini, jadi bagian 10% belum bisa dibagikan. SHU sukarela dihitung dari saldo sukarela setiap akhir bulan (Rp x bulan).");if(L>0&&!tT)w.push("Isi kolom transaksi anggota agar bagian 15% bisa dibagikan.");if(L>0&&!pen.length)w.push("Isi penerima bagian pengurus & pengawas.");
+ $("#h_note").innerHTML=w.map((t,i)=>`<div class="msg${i?" err":""}">${esc(t)}</div>`).join("");
+ $("#hf").innerHTML=`<tr><td>Jumlah</td><td class="n">${rp(sm("suk"))}</td><td class="n">${idn(tW)}</td><td class="n">${rp(tT)}</td><td class="n">${rp(sm("hs"))}</td><td class="n">${rp(sm("ht"))}</td><td class="n">${rp(sm("ha"))}</td><td class="n">${rp(sm("z"))}</td><td class="n">${rp(sm("wj"))}</td><td class="n">${rp(sm("d"))}</td><td></td></tr>`;
+ $("#h_xls").onclick=()=>unduh(SHUROWS.map(r=>({Anggota:r.nama,"Simpanan sukarela":r.suk,"Bobot Rp x bulan":Math.round(r.w),Transaksi:r.tx,"SHU sukarela":Math.round(r.hs),"SHU transaksi":Math.round(r.ht),"SHU anggota":Math.round(r.ha),"Total SHU":Math.round(r.z),"Simpanan wajib":r.wj,"Total diterima":Math.round(r.d)})),`SHU-${th}.xlsx`)}
+const rowSave=r=>({id:r.id,nama:r.nama,instansi:r.instansi,sukarela:r.suk,bobot:Math.round(r.w),transaksi:r.tx,wajib:r.wj,shuSukarela:Math.round(r.hs),shuTransaksi:Math.round(r.ht),shuAnggota:Math.round(r.ha),total:Math.round(r.z)});
+$("#h_save").onclick=async()=>{const m=$("#h_msg"),L=+$("#h_laba").value,thn=String(thSHU()),pen=$("#h_pen").value.split("\n").map(s=>s.trim()).filter(Boolean);
  if(!(L>0)){msg(m,"Isi laba bersih terlebih dahulu.",true);return}
- try{const lama=await getDoc(doc(db,"shu",thn)),data={tahun:+thn,laba:L,persen:SHU_PCT,penerima:pen,perPenerima:pen.length?Math.round(L*SHU_PCT.pengurus/100/pen.length):0,
-  hasil:SHUROWS.map(r=>({id:r.id,nama:r.nama,sukarela:r.suk,transaksi:r.tx,shuSukarela:Math.round(r.hs),shuTransaksi:Math.round(r.ht),shuAnggota:Math.round(r.ha),total:Math.round(r.z)})),disimpan:new Date().toISOString(),oleh:me.nama};
+ try{const lama=await getDoc(doc(db,"shu",thn));if(lama.exists()&&lama.data().dibagi){msg(m,"SHU tahun ini sudah dibagikan, perhitungan tidak bisa diubah.",true);return}
+  const data={tahun:+thn,laba:L,persen:SHU_PCT,penerima:pen,perPenerima:pen.length?Math.round(L*SHU_PCT.pengurus/100/pen.length):0,hasil:SHUROWS.map(rowSave),disimpan:new Date().toISOString(),oleh:me.nama};
   const b=writeBatch(db);b.set(doc(db,"shu",thn),data);logOp(b,{aksi:lama.exists()?"ubah":"tambah",kol:"shu",id:thn,sebelum:lama.exists()?{laba:lama.data().laba}:null,sesudah:{laba:L},detail:`SHU tahun ${thn}`,alasan:lama.exists()?"Perhitungan ulang":""});await b.commit();
   msg(m,`Perhitungan SHU tahun ${thn} tersimpan.`)}catch(e){msg(m,"Gagal menyimpan: "+e.message,true)}};
+const slipHtml=(r,th)=>`<section style="page-break-after:always;font:14px/1.5 system-ui,sans-serif;max-width:560px;margin:24px auto;border:2px solid #104020;padding:22px"><div style="text-align:center"><b style="font-size:17px">KOPERASI PGRI SANGGAM BARINTAK</b><br>Jalan Ramania, Gedung SKB, Tanjung Redeb, Berau<hr><b>SLIP PEMBAGIAN SISA HASIL USAHA</b><br><span style="background:#104020;color:#fff;padding:2px 12px;border-radius:12px;display:inline-block;margin-top:6px">TAHUN BUKU ${th} (1 Januari - 31 Desember ${th})</span></div><p>Nama: <b>${esc(r.nama)}</b><br>Instansi: ${esc(r.instansi||"-")}</p><table style="width:100%;border-collapse:collapse">${[["Simpanan wajib tahun "+th+" (dikembalikan)",r.wj],["SHU simpanan sukarela",r.hs],["SHU transaksi",r.ht],["SHU anggota",r.ha]].map(([l,v])=>`<tr><td style="border-bottom:1px solid #ccc;padding:5px 0">${l}</td><td style="text-align:right;border-bottom:1px solid #ccc">${rp(v)}</td></tr>`).join("")}<tr><td style="padding:8px 0"><b>TOTAL DITERIMA</b></td><td style="text-align:right"><b>${rp(r.wj+r.z)}</b></td></tr></table><p style="font-size:12px;color:#555">SHU sukarela dihitung dari lama simpanan: ${idn(r.w)} (Rp x bulan). Simpanan pokok dan sukarela tidak ikut dikembalikan; simpanan sukarela dapat ditarik kapan saja.</p><p style="text-align:right">Dicetak ${today()}<br><br><br>Bendahara</p></section>`;
+const slipDoc=(rows,th)=>`<!doctype html><meta charset="utf-8"><title>Slip SHU tahun buku ${th}</title><style>@media print{.np{display:none}}</style><div class="np" style="text-align:center;margin:12px"><button onclick="print()">Cetak / simpan PDF</button></div>`+rows.map(r=>slipHtml(r,th)).join("");
+$("#hb").onclick=e=>{const b=e.target.closest("[data-slip]");if(!b)return;const r=SHUROWS.find(x=>x.id===b.dataset.slip);if(r)window.open(URL.createObjectURL(new Blob([slipDoc([r],thSHU())],{type:"text/html"})),"_blank")};
+$("#h_slip").onclick=()=>{const th=thSHU(),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([slipDoc(SHUROWS,th)],{type:"text/html"}));a.download=`slip-SHU-tahun-buku-${th}.html`;a.click()};
+async function syncSemua(){await getAnggota(true);const s=await getDocs(collection(db,"simpanan")),t={};s.forEach(d=>{const x=d.data();(t[x.anggotaId]??={pokok:0,wajib:0,sukarela:0})[x.jenis]+=x.jumlah});
+ const aktif=ANG.filter(a=>a.status!=="berhenti"),g={pokok:0,wajib:0,sukarela:0};
+ for(let i=0;i<aktif.length;i+=400){const b=writeBatch(db);aktif.slice(i,i+400).forEach(a=>{const x=t[a.id]||{pokok:0,wajib:0,sukarela:0};for(const k in g)g[k]+=x[k];b.set(doc(db,"publik_anggota",a.id),{no:a.no,nama:a.nama,instansi:a.instansi||"",...x,total:x.pokok+x.wajib+x.sukarela},{merge:true})});await b.commit()}
+ await setDoc(doc(db,"publik_ringkasan","utama"),{jumlahAnggota:aktif.length,...g,diperbarui:new Date().toISOString()},{merge:true})}
+$("#h_bagi").onclick=async()=>{const th=thSHU(),m=$("#h_msg");
+ try{const lama=await getDoc(doc(db,"shu",String(th)));await muatTB();
+  if(!TBD[th])return msg(m,`Tutup tahun buku ${th} dulu di menu Tutup buku.`,true);if(!lama.exists())return msg(m,"Simpan perhitungan SHU dulu.",true);if(lama.data().dibagi)return msg(m,"SHU tahun ini sudah dibagikan.",true);
+  const v=await tanya({judul:`Bagikan SHU tahun buku ${th}`,tombol:"Bagikan",fields:[{type:"note",label:`Simpanan wajib tahun ${th} seluruh anggota dikembalikan dan dihapus dari rekap simpanan, lalu SHU dibayarkan. Total kas keluar ${rp(SHUROWS.reduce((t,r)=>t+r.wj+Math.round(r.z),0))}. Tanggal pembagian harus di tahun buku yang masih terbuka.`},{k:"tgl",label:"Tanggal pembagian",type:"date",req:1}],nilai:{tgl:today()},validasi:o=>o.tgl<`${th+1}-01-01`?`Tanggal pembagian harus setelah 31 Desember ${th}.`:tertutup(o.tgl)?"Tahun buku pada tanggal itu sudah ditutup.":""});if(!v)return;
+  const ops=[];let urut=Date.now(),wt=0;
+  SHUROWS.forEach(r=>{const z=Math.round(r.z);if(r.wj>0){wt+=r.wj;ops.push(b=>b.set(doc(db,"bku",`shu${th}_${r.id}_w`),{tanggal:v.tgl,kode:"SIM",keterangan:`Pengembalian simpanan wajib ${th} an: ${r.nama}`,kredit:0,debit:r.wj,ref:`shu${th}_${r.id}`,anggotaId:r.id,jenis:"wajib",urut:urut++}))}
+   if(z>0)ops.push(b=>b.set(doc(db,"bku",`shu${th}_${r.id}_s`),{tanggal:v.tgl,kode:"SHU",keterangan:`Pembagian SHU tahun buku ${th} an: ${r.nama}`,kredit:0,debit:z,urut:urut++}))});
+  SIM.filter(x=>x.jenis==="wajib"&&(x.periode||"").startsWith(th+"-")).forEach(x=>ops.push(b=>b.delete(doc(db,"simpanan",x.id))));
+  for(let i=0;i<ops.length;i+=400){const b=writeBatch(db);ops.slice(i,i+400).forEach(f=>f(b));await b.commit()}
+  const b=writeBatch(db);b.set(doc(db,"shu",String(th)),{dibagi:true,tglBagi:v.tgl,wajibKembali:wt,hasil:SHUROWS.map(rowSave)},{merge:true});b.set(doc(db,"tahunbuku",String(th)),{dibagi:true,tglBagi:v.tgl,wajibKembali:wt},{merge:true});
+  logOp(b,{aksi:"bagi_shu",kol:"shu",id:String(th),sesudah:{tglBagi:v.tgl,wajibKembali:wt},detail:`Pembagian SHU tahun buku ${th}`});await b.commit();
+  await syncSemua();await muatTB();await loadShu();msg(m,`SHU tahun buku ${th} dibagikan. Simpanan wajib tahun itu sudah dihapus dari rekap anggota dan pengeluaran tercatat di Buku kas.`)}
+ catch(e){msg(m,"Gagal: "+e.message,true)}};
 
 // ---------- Impor Excel ----------
 $("#imp").onclick=async()=>{const m=$("#imsg"),file=$("#f").files[0];if(!file){msg(m,"Pilih file Excel dulu.",true);return}
@@ -362,22 +392,22 @@ const AKUN=[["","Otomatis menurut kode"],["pend_usaha","Pendapatan usaha"],["pen
 const ALBL=Object.fromEntries(AKUN),PEND=["pend_usaha","pend_lain"],BEB=["beban_usaha","beban_ops"];
 $("#b_akun").innerHTML=AKUN.map(([v,l])=>`<option value="${v}">${esc(l)}</option>`).join("");
 const kurang=x=>{const k=[];if(!x.keterangan)k.push("keterangan");if(!x.kode)k.push("kode");if(x.kode==="SIM"&&!x.ref&&!x.konfirmasi)k.push("anggota & pembagian simpanan");return k};
-const net=x=>(x.kredit||0)-(x.debit||0),UNIT=x=>x.kode==="CAFE"||x.kode==="KONVEKSI"?x.kode:"UMUM";
-const akunDari=x=>x.akun||(x.kode==="SIM"?"simpanan":UNIT(x)!=="UMUM"?(x.kredit?"pend_usaha":"beban_usaha"):(x.kredit?"pend_lain":"beban_ops"));
+const net=x=>(x.kredit||0)-(x.debit||0),UNIT=x=>TIPE[x.kode]==="usaha"?x.kode:"UMUM";
+const akunDari=x=>{if(x.akun)return x.akun;const t=TIPE[x.kode]||"umum";return t==="usaha"?(x.kredit?"pend_usaha":"beban_usaha"):t==="umum"?(x.kredit?"pend_lain":"beban_ops"):t};
 const S=(L,f)=>L.filter(x=>f(akunDari(x))).reduce((t,x)=>t+net(x),0),sm=(L,k)=>L.reduce((t,x)=>t+(x[k]||0),0);
 function hitungKeu(th){const s=th+"-01-01",e=th+"-12-31",all=BKU.filter(x=>(x.tanggal||"")<=e),yr=all.filter(x=>x.tanggal>=s),pr=all.filter(x=>x.tanggal<s),is=a=>b=>b===a,P=a=>S(yr,is(a));
  const lb=L=>S(L,a=>PEND.includes(a))+S(L,a=>BEB.includes(a)),k={th,pu:P("pend_usaha"),pl:P("pend_lain"),bu:-P("beban_usaha"),bo:-P("beban_ops")};
  k.pend=k.pu+k.pl;k.beb=k.bu+k.bo;k.laba=k.pend-k.beb;k.labaLalu=lb(pr);
- k.unit=Object.fromEntries(["CAFE","KONVEKSI","UMUM"].map(u=>{const L=yr.filter(x=>UNIT(x)===u);return [u,S(L,a=>PEND.includes(a))+S(L,a=>BEB.includes(a))]}));
+ k.unit=Object.fromEntries([...new Set([...KODE.filter(c=>TIPE[c]==="usaha"),"UMUM"])].map(u=>{const L=yr.filter(x=>UNIT(x)===u);return [u,S(L,a=>PEND.includes(a))+S(L,a=>BEB.includes(a))]}));
  k.kas=all.reduce((t,x)=>t+net(x),0);k.kasAwal=pr.reduce((t,x)=>t+net(x),0);k.aset=-S(all,is("aset_tetap"));k.piutang=-S(all,is("piutang"));k.utang=S(all,is("utang"));k.dist=-S(all,is("dist_shu"));
  const sb=S(all,is("simpanan")),ss={pokok:0,wajib:0,sukarela:0};SIM.forEach(x=>{const d=x.tanggal||(x.periode?x.periode+"-31":"");if(!d||d<=e)ss[x.jenis]+=x.jumlah});
- k.ss=ss;k.selisih=sb-ss.pokok-ss.wajib-ss.sukarela;k.ditahan=k.labaLalu-k.dist;k.ekuitas=sb+k.ditahan+k.laba;k.pasiva=k.utang+k.ekuitas;k.aktiva=k.kas+k.piutang+k.aset;
+ Object.values(TBD).forEach(t=>{if(t.dibagi&&t.tglBagi>e)ss.wajib+=t.wajibKembali||0});k.ss=ss;k.selisih=sb-ss.pokok-ss.wajib-ss.sukarela;k.ditahan=k.labaLalu-k.dist;k.ekuitas=sb+k.ditahan+k.laba;k.pasiva=k.utang+k.ekuitas;k.aktiva=k.kas+k.piutang+k.aset;
  k.masuk=AKUN.filter(a=>a[0]).map(([a,l])=>[l,yr.filter(x=>akunDari(x)===a).reduce((t,x)=>t+(x.kredit||0),0)]).filter(r=>r[1]);
  k.keluar=AKUN.filter(a=>a[0]).map(([a,l])=>[l,yr.filter(x=>akunDari(x)===a).reduce((t,x)=>t+(x.debit||0),0)]).filter(r=>r[1]);
  k.auto=yr.filter(x=>!x.akun&&x.kode!=="SIM").length;k.simBelum=BKU.filter(x=>x.kode==="SIM"&&!x.ref&&!x.konfirmasi).length;k.tdkLengkap=yr.filter(x=>kurang(x).length).length;return k}
 function sect(XL,j,rows){XL.push({Laporan:j,Uraian:"",Jumlah:""});rows.forEach(([l,v,b,i])=>XL.push({Laporan:"",Uraian:(i?"   ":"")+l,Jumlah:v??""}));
  return `<div class="panel scroll"><h2 style="margin-bottom:8px">${esc(j)}</h2><table><tbody>${rows.map(([l,v,b,i])=>`<tr style="${b?"font-weight:700":""}"><td style="${i?"padding-left:28px":""}">${esc(l)}</td><td class="n">${typeof v==="number"?rp(v):esc(v??"")}</td></tr>`).join("")}</tbody></table></div>`}
-const LR=k=>[["PENDAPATAN",null,1],["Pendapatan usaha (cafe, konveksi, dll)",k.pu,0,1],["Pendapatan lain",k.pl,0,1],["Jumlah pendapatan",k.pend,1],["BEBAN",null,1],["Beban/pembelian unit usaha",k.bu,0,1],["Beban operasional & administrasi",k.bo,0,1],["Jumlah beban",k.beb,1],["LABA (RUGI) BERSIH TAHUN "+k.th,k.laba,1],["Laba (rugi) per unit",null,1],["Unit Cafe",k.unit.CAFE,0,1],["Unit Konveksi",k.unit.KONVEKSI,0,1],["Umum / di luar unit",k.unit.UMUM,0,1]];
+const LR=k=>[["PENDAPATAN",null,1],["Pendapatan usaha (cafe, konveksi, dll)",k.pu,0,1],["Pendapatan lain",k.pl,0,1],["Jumlah pendapatan",k.pend,1],["BEBAN",null,1],["Beban/pembelian unit usaha",k.bu,0,1],["Beban operasional & administrasi",k.bo,0,1],["Jumlah beban",k.beb,1],["LABA (RUGI) BERSIH TAHUN "+k.th,k.laba,1],["Laba (rugi) per unit",null,1],...Object.entries(k.unit).map(([u,v])=>[u==="UMUM"?"Umum / di luar unit":"Unit "+u,v,0,1])];
 const NR=k=>[["ASET",null,1],["Kas dan bank",k.kas,0,1],["Piutang / pinjaman",k.piutang,0,1],["Aset tetap / inventaris (harga perolehan)",k.aset,0,1],["JUMLAH ASET",k.aktiva,1],["KEWAJIBAN",null,1],["Utang",k.utang,0,1],["EKUITAS",null,1],["Simpanan pokok",k.ss.pokok,0,1],["Simpanan wajib",k.ss.wajib,0,1],["Simpanan sukarela",k.ss.sukarela,0,1],["Simpanan belum dirinci (selisih BKU dan data anggota)",k.selisih,0,1],["Cadangan & laba ditahan tahun lalu (setelah SHU dibayarkan)",k.ditahan,0,1],["Laba tahun berjalan",k.laba,0,1],["Jumlah ekuitas",k.ekuitas,1],["JUMLAH KEWAJIBAN + EKUITAS",k.pasiva,1]];
 const KS=k=>[["Saldo kas awal tahun",k.kasAwal,1],["Penerimaan",null,1],...k.masuk.map(r=>[r[0],r[1],0,1]),["Jumlah penerimaan",k.masuk.reduce((t,r)=>t+r[1],0),1],["Pengeluaran",null,1],...k.keluar.map(r=>[r[0],r[1],0,1]),["Jumlah pengeluaran",k.keluar.reduce((t,r)=>t+r[1],0),1],["SALDO KAS AKHIR TAHUN",k.kas,1]];
 async function muatKeu(){const [b,s]=await Promise.all([getDocs(collection(db,"bku")),getDocs(collection(db,"simpanan")),getAnggota(true)]);
@@ -397,3 +427,36 @@ async function renderLap(){const th=+$("#k_thn").value,j=$("#k_jenis").value,k=h
  $("#k_out").innerHTML=o.join("");$("#k_xls").onclick=()=>unduh(XL,`laporan-${j}-${th}.xlsx`)}
 $("#k_thn").onchange=renderLap;$("#k_jenis").onchange=renderLap;
 $("#h_ambil").onclick=async()=>{if(!can("bku","lihat"))return alert("Butuh hak lihat Buku kas.");await muatKeu();const k=hitungKeu(+$("#h_thn").value);$("#h_laba").value=Math.max(0,Math.round(k.laba));hitungShu();msg($("#h_msg"),`Laba bersih tahun ${k.th} dari laporan laba rugi: ${rp(k.laba)}.`)};
+
+// ---------- Tahun buku, kode transaksi, rekap RAT ----------
+let TB=new Set(),TBD={};
+async function muatTB(){const s=await getDocs(collection(db,"tahunbuku"));TBD={};s.docs.forEach(d=>TBD[d.id]=d.data());TB=new Set(Object.keys(TBD))}
+const tertutup=t=>!!t&&TB.has(String(t).slice(0,4));
+function renderKode(){$("#b_kode").innerHTML=KODE.map(k=>`<option value="${esc(k)}">${esc(k)} (${esc(KLBL[k]||"")})</option>`).join("")}
+async function muatKode(){renderKode();const s=await getDocs(collection(db,"kode_bku"));s.docs.forEach(d=>{const x=d.data();if(!KODE.includes(x.kode))KODE.push(x.kode);TIPE[x.kode]=x.tipe;KLBL[x.kode]=x.label});renderKode()}
+$("#b_kodenew").onclick=async()=>{try{const v=await tanya({judul:"Tambah kode transaksi",alasan:false,fields:[{k:"kode",label:"Kode (huruf/angka tanpa spasi, mis. SEWA)",req:1},{k:"label",label:"Nama kode",req:1},{k:"tipe",label:"Perlakuan dalam laporan",type:"select",opt:[["usaha","Unit usaha (masuk = pendapatan, keluar = beban; laba dihitung per unit)"],["umum","Umum (masuk = pendapatan lain, keluar = beban operasional)"],["piutang","Piutang / peminjaman dana (keluar = dipinjamkan, masuk = dikembalikan)"],["utang","Utang"],["aset_tetap","Pembelian aset tetap"]]}],validasi:o=>/^[A-Z0-9]{2,12}$/.test(o.kode.toUpperCase())?(KODE.includes(o.kode.toUpperCase())?"Kode sudah ada.":""):"Kode 2-12 huruf/angka tanpa spasi."});if(!v)return;
+ const k=v.kode.toUpperCase(),d={kode:k,label:v.label,tipe:v.tipe},b=writeBatch(db);b.set(doc(db,"kode_bku",k),d);logOp(b,{aksi:"tambah",kol:"kode_bku",id:k,sesudah:d,detail:k});await b.commit();await muatKode();$("#b_kode").value=k}catch(e){alert("Gagal: "+e.message)}};
+function piutangPihak(th){const m={};BKU.filter(x=>(x.tanggal||"")<=th+"-12-31"&&akunDari(x)==="piutang").forEach(x=>{const p=x.pihak||"(tanpa nama)";m[p]=(m[p]||0)+(x.debit||0)-(x.kredit||0)});return Object.entries(m).filter(r=>Math.abs(r[1])>=1)}
+async function loadTutup(){if(!$("#c_thn").value)$("#c_thn").value=new Date().getFullYear();await muatKeu();await muatTB();renderTutup()}
+function renderTutup(){const th=+$("#c_thn").value,k=hitungKeu(th),t=TBD[th],pp=piutangPihak(th),XL=[],pc=SHU_PCT.anggota+SHU_PCT.transaksi+SHU_PCT.sukarela,
+ wj=SIM.filter(x=>x.jenis==="wajib"&&(x.periode||"").startsWith(th+"-")).reduce((s,x)=>s+x.jumlah,0),shuA=Math.max(0,Math.round(k.laba*pc/100)),butuh=wj+shuA,sisa=k.kas-butuh;
+ $("#c_tutup").classList.toggle("hide",!!t||!can("tutup","ubah"));$("#c_buka").classList.toggle("hide",!t||!!t.dibagi||!can("tutup","ubah"));
+ $("#c_out").innerHTML=`<div class="warn"><span><b>Tahun buku ${th}: ${t?(t.dibagi?"DITUTUP, SHU sudah dibagikan":"DITUTUP"):"TERBUKA"}</b></span></div>`
+ +sect(XL,"Pemeriksaan sebelum tutup buku",[["Transaksi SIM belum dikonfirmasi",String(k.simBelum),0,1],["Transaksi tahun ini belum lengkap",String(k.tdkLengkap),0,1],["Neraca seimbang",Math.abs(k.aktiva-k.pasiva)<1?"Ya":"Tidak",0,1],["Selisih simpanan BKU vs data anggota",k.selisih,0,1]])
+ +sect(XL,"Sisa piutang (peminjaman dana) per 31 Desember "+th,[...pp.map(([n,v])=>[n,v,0,1]),["Total sisa piutang",k.piutang,1]])
+ +sect(XL,"Perkiraan SHU yang dapat dibagikan",[["Laba bersih tahun "+th,k.laba,1],[`SHU untuk anggota (${pc}% laba)`,shuA,0,1],["Simpanan wajib tahun ini yang dikembalikan",wj,0,1],["Kebutuhan kas pembagian",butuh,1],["Saldo kas per 31 Desember",k.kas,0,1],["Sisa kas setelah pembagian",sisa,1],[sisa<0?"Kas belum cukup: tunggu pelunasan piutang atau sesuaikan pembagian.":"Kas mencukupi untuk pembagian.",null]])}
+$("#c_thn").onchange=renderTutup;
+$("#c_tutup").onclick=async()=>{const th=+$("#c_thn").value,m=$("#c_msg");if(today()<th+"-12-01")return msg(m,`Tahun buku baru bisa ditutup mulai 1 Desember ${th}.`,true);
+ const k=hitungKeu(th),v=await tanya({judul:"Tutup tahun buku "+th,tombol:"Tutup buku",fields:[{type:"note",label:`Setelah ditutup, transaksi bertanggal ${th} tidak bisa ditambah, diubah, atau dihapus. Laba bersih ${rp(k.laba)}, sisa piutang ${rp(k.piutang)}.`}]});if(!v)return;
+ const d={tahun:th,status:"tutup",laba:Math.round(k.laba),piutang:Math.round(k.piutang),kas:Math.round(k.kas),ditutupOleh:me.nama,waktu:new Date().toISOString()},b=writeBatch(db);b.set(doc(db,"tahunbuku",String(th)),d);logOp(b,{aksi:"tutup_buku",kol:"tahunbuku",id:String(th),sesudah:d,alasan:v.alasan,detail:"Tahun buku "+th});
+ try{await b.commit();await muatTB();renderTutup();msg(m,`Tahun buku ${th} ditutup.`)}catch(e){msg(m,"Gagal: "+e.message,true)}};
+$("#c_buka").onclick=async()=>{const th=+$("#c_thn").value,m=$("#c_msg"),v=await tanya({judul:"Buka kembali tahun buku "+th,tombol:"Buka kembali",fields:[{type:"note",label:"Transaksi tahun ini bisa diubah lagi. Hanya bisa dilakukan sebelum SHU dibagikan."}]});if(!v)return;
+ const b=writeBatch(db);b.delete(doc(db,"tahunbuku",String(th)));logOp(b,{aksi:"buka_buku",kol:"tahunbuku",id:String(th),alasan:v.alasan,detail:"Buka kembali tahun buku "+th});
+ try{await b.commit();await muatTB();renderTutup();msg(m,`Tahun buku ${th} dibuka kembali.`)}catch(e){msg(m,"Gagal: "+e.message,true)}};
+$("#k_rat").onclick=async()=>{const th=+$("#k_thn").value;await muatKeu();await muatTB();const k=hitungKeu(th),wb=XLSX.utils.book_new(),add=(n,r)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(r),n),X=r=>{const L=[];sect(L,"",r);return L.slice(1)};
+ const sd=await getDoc(doc(db,"shu",String(th))),act=ANG.filter(a=>a.status!=="berhenti"),t={};SIM.forEach(x=>{(t[x.anggotaId]??={pokok:0,wajib:0,sukarela:0})[x.jenis]+=x.jumlah});
+ add("Ringkasan",X([["Tahun buku",String(th)],["Anggota aktif",String(act.length)],["Anggota baru",String(ANG.filter(a=>(a.tglDaftar||"").startsWith(th)).length)],["Total simpanan pokok",k.ss.pokok],["Total simpanan wajib",k.ss.wajib],["Total simpanan sukarela",k.ss.sukarela],["Laba bersih",k.laba],["Saldo kas",k.kas],["Sisa piutang",k.piutang],["Status tahun buku",TBD[th]?(TBD[th].dibagi?"Ditutup, SHU dibagikan":"Ditutup"):"Terbuka"]]));
+ add("Laba Rugi",X(LR(k)));add("Neraca",X(NR(k)));add("Arus Kas",X(KS(k)));add("Piutang",piutangPihak(th).map(([n,v])=>({Peminjam:n,"Sisa piutang":v})));
+ add("SHU per anggota",(sd.exists()?sd.data().hasil||[]:[]).map(r=>({Anggota:r.nama,"Bobot sukarela (Rp x bulan)":r.bobot||0,"SHU sukarela":r.shuSukarela,"SHU transaksi":r.shuTransaksi,"SHU anggota":r.shuAnggota,"Simpanan wajib":r.wajib||0,"Total diterima":(r.wajib||0)+r.total})));
+ add("Simpanan anggota",act.map(a=>{const x=t[a.id]||{pokok:0,wajib:0,sukarela:0};return {No:a.no,Nama:a.nama,Instansi:a.instansi||"",Pokok:x.pokok,Wajib:x.wajib,Sukarela:x.sukarela,Total:x.pokok+x.wajib+x.sukarela}}));
+ XLSX.writeFile(wb,`rekap-RAT-${th}.xlsx`)};
