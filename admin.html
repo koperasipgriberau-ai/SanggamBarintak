@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>Admin · Koperasi PGRI Sanggam Barintak</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Public+Sans:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css"></head><body>
+<header class="top"><div style="max-width:1080px;margin:0 auto"><h1>Ruang kerja pengurus</h1><p id="who">Masuk untuk mengelola data koperasi.</p>
+<nav id="nav" class="hide" role="tablist"><button role="tab" data-t="ringkasan" aria-selected="true">Ringkasan</button><button role="tab" data-t="anggota" aria-selected="false">Anggota</button><button role="tab" data-t="impor" aria-selected="false">Impor Excel</button><button id="out" role="tab" aria-selected="false">Keluar</button></nav></div></header>
+<main>
+<section id="login" class="panel" style="max-width:460px"><h2>Masuk</h2>
+<label for="em">Email</label><input id="em" type="email" autocomplete="username">
+<label for="pw">Kata sandi</label><input id="pw" type="password" autocomplete="current-password">
+<div class="row" style="margin-top:14px"><button class="btn" id="go">Masuk</button></div><div id="lmsg" class="msg err hide"></div></section>
+<section id="ringkasan" class="hide"><div class="stats" id="stats"></div></section>
+<section id="anggota" class="hide"><div class="panel scroll"><table><thead><tr><th class="n">No</th><th>Nama</th><th>Instansi</th><th>Tgl daftar</th><th>Status</th></tr></thead><tbody id="ab"></tbody></table></div></section>
+<section id="impor" class="hide"><div class="panel"><h2>Impor dari LAPORAN PEMBUKUAN KOPERASI PGRI.xlsx</h2>
+<p>Membaca sheet <b>SIMPANAN ANGGOTA</b>. Impor ulang aman: data dengan nomor yang sama diperbarui, bukan digandakan.</p>
+<input type="file" id="f" accept=".xlsx"><div class="row" style="margin-top:12px"><button class="btn" id="imp" disabled>Impor sekarang</button></div><div id="imsg" class="msg hide"></div></div></section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script type="module" src="admin.js"></script></body></html>

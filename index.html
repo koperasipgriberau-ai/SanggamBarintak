@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Koperasi PGRI Sanggam Barintak</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Public+Sans:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css"></head><body>
+<header class="top"><div style="max-width:1080px;margin:0 auto">
+<h1>Koperasi PGRI Sanggam Barintak</h1>
+<p>Jalan Ramania, Gedung SKB, Tanjung Redeb, Berau. Data simpanan anggota dan susunan pengurus.</p>
+<nav role="tablist"><button role="tab" data-t="anggota" aria-selected="true">Anggota & simpanan</button><button role="tab" data-t="pengurus" aria-selected="false">Pengurus & pengawas</button></nav></div></header>
+<main>
+<section id="anggota">
+<div class="stats" id="stats"></div>
+<div class="panel"><div class="row"><label for="cari" style="margin:0">Cari nama atau sekolah</label><input id="cari" type="search" placeholder="mis. SMPN 1 Sambaliung"></div>
+<div class="scroll"><table><thead><tr><th class="n">No</th><th>Nama</th><th>Instansi</th><th class="n">Pokok</th><th class="n">Wajib</th><th class="n">Sukarela</th><th class="n">Total</th></tr></thead><tbody id="tb"><tr><td colspan="7">Memuat data…</td></tr></tbody><tfoot id="tf"></tfoot></table></div></div>
+</section>
+<section id="pengurus" class="hide"><div class="panel"><h2>Pengurus</h2><div class="people" id="p1" style="margin-top:12px"></div></div>
+<div class="panel"><h2>Pengawas</h2><div class="people" id="p2" style="margin-top:12px"></div></div></section>
+</main>
+<footer>Simpanan pokok Rp500.000 · simpanan wajib Rp50.000 per bulan · simpanan sukarela maksimal Rp15.000.000</footer>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getFirestore,collection,getDocs,doc,getDoc} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {firebaseConfig} from "./firebase-config.js";
+const db=getFirestore(initializeApp(firebaseConfig));
+const $=s=>document.querySelector(s), rp=n=>"Rp"+(n||0).toLocaleString("id-ID");
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.setAttribute("aria-selected",x===b));
+ ["anggota","pengurus"].forEach(id=>$("#"+id).classList.toggle("hide",id!==b.dataset.t))});
+const PENGURUS=[["Marsono","Ketua"],["Ika Novita Mulia","Sekretaris"],["Eli Sutrisnaniati","Bendahara"],["M. Romsyah","Koordinator Unit Usaha"]];
+const PENGAWAS=[["Hj. Mardiatul Idalisah, S.Pd., M.M.","Ketua Pengawas"],["Mustaring, S.Pd., M.Pd.","Anggota Pengawas"],["Dr. H. Saleh, S.T., M.Pd.","Anggota Pengawas"]];
+const card=l=>l.map(([n,j])=>`<div class="person"><b>${esc(n)}</b><small>${esc(j)}</small></div>`).join("");
+$("#p1").innerHTML=card(PENGURUS);$("#p2").innerHTML=card(PENGAWAS);
+let rows=[];
+function draw(){const q=$("#cari").value.toLowerCase();const r=rows.filter(a=>(a.nama+" "+a.instansi).toLowerCase().includes(q));
+ $("#tb").innerHTML=r.length?r.map((a,i)=>`<tr><td class="n">${i+1}</td><td>${esc(a.nama)}</td><td>${esc(a.instansi)}</td><td class="n">${rp(a.pokok)}</td><td class="n">${rp(a.wajib)}</td><td class="n">${rp(a.sukarela)}</td><td class="n">${rp(a.total)}</td></tr>`).join(""):`<tr><td colspan="7">Tidak ada anggota yang cocok.</td></tr>`;
+ const s=k=>r.reduce((t,a)=>t+(a[k]||0),0);
+ $("#tf").innerHTML=`<tr><td></td><td colspan="2">Jumlah (${r.length} anggota)</td><td class="n">${rp(s("pokok"))}</td><td class="n">${rp(s("wajib"))}</td><td class="n">${rp(s("sukarela"))}</td><td class="n">${rp(s("total"))}</td></tr>`}
+$("#cari").oninput=draw;
+try{const snap=await getDocs(collection(db,"publik_anggota"));
+ rows=snap.docs.map(d=>d.data()).sort((a,b)=>(a.no||0)-(b.no||0));
+ const t=rows.reduce((s,a)=>s+(a.total||0),0);
+ $("#stats").innerHTML=`<div class="stat"><b>${rows.length}</b><span>anggota terdaftar</span></div><div class="stat"><b>${rp(t)}</b><span>total simpanan anggota</span></div>`;
+ draw()}catch(e){$("#tb").innerHTML=`<tr><td colspan="7" class="msg err">Data belum bisa dimuat. Periksa konfigurasi Firebase dan aturan Firestore.</td></tr>`;console.error(e)}
+</script></body></html>
