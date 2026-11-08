@@ -1,19 +1,19 @@
 <!doctype html>
 <html lang="id"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Koperasi PGRI Sanggam Barintak</title>
+<title>Koperasi PGRI Sanggam Barintak</title><link rel="icon" href="logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Public+Sans:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="app.css"></head><body>
-<header class="top"><div style="max-width:1080px;margin:0 auto">
-<h1>Koperasi PGRI Sanggam Barintak</h1>
-<p>Jalan Ramania, Gedung SKB, Tanjung Redeb, Berau. Data simpanan anggota dan susunan pengurus.</p>
+<header class="top"><div style="max-width:1120px;margin:0 auto">
+<div class="brand"><img class="logo" src="logo.png" alt="Logo Koperasi PGRI Sanggam Barintak"><div><h1>Koperasi PGRI Sanggam Barintak</h1>
+<p>Jalan Ramania, Gedung SKB, Tanjung Redeb, Berau. Data simpanan anggota dan susunan pengurus.</p></div></div>
 <nav role="tablist"><button role="tab" data-t="anggota" aria-selected="true">Anggota & simpanan</button><button role="tab" data-t="pengurus" aria-selected="false">Pengurus & pengawas</button></nav></div></header>
 <main>
 <section id="anggota">
 <div class="stats" id="stats"></div>
-<div class="panel"><div class="row"><label for="cari" style="margin:0">Cari nama atau sekolah</label><input id="cari" type="search" placeholder="mis. SMPN 1 Sambaliung"></div>
-<div class="scroll"><table><thead><tr><th class="n">No</th><th>Nama</th><th>Instansi</th><th class="n">Pokok</th><th class="n">Wajib</th><th class="n">Sukarela</th><th class="n">Total</th></tr></thead><tbody id="tb"><tr><td colspan="7">Memuat data…</td></tr></tbody><tfoot id="tf"></tfoot></table></div></div>
+<div class="panel"><div class="row" style="margin-top:0"><label for="cari" style="margin:0">Cari nama atau sekolah</label><input id="cari" type="search" placeholder="mis. SMPN 1 Sambaliung" style="max-width:420px"></div>
+<div class="scroll" style="margin-top:12px"><table><thead><tr><th class="n">No</th><th>Nama</th><th>Instansi</th><th class="n">Pokok</th><th class="n">Wajib</th><th class="n">Sukarela</th><th class="n">Total</th></tr></thead><tbody id="tb"><tr><td colspan="7">Memuat data…</td></tr></tbody><tfoot id="tf"></tfoot></table></div></div>
 </section>
 <section id="pengurus" class="hide"><div class="panel"><h2>Pengurus</h2><div class="people" id="p1" style="margin-top:12px"></div></div>
 <div class="panel"><h2>Pengawas</h2><div class="people" id="p2" style="margin-top:12px"></div></div></section>
@@ -21,7 +21,7 @@
 <footer>Simpanan pokok Rp500.000 · simpanan wajib Rp50.000 per bulan · simpanan sukarela maksimal Rp15.000.000</footer>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getFirestore,collection,getDocs,doc,getDoc} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getFirestore,collection,getDocs} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {firebaseConfig} from "./firebase-config.js";
 const db=getFirestore(initializeApp(firebaseConfig));
 const $=s=>document.querySelector(s), rp=n=>"Rp"+(n||0).toLocaleString("id-ID");

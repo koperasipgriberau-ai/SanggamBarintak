@@ -1,34 +1,88 @@
 <!doctype html>
 <html lang="id"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
-<title>Admin · Koperasi PGRI Sanggam Barintak</title>
+<title>Admin · Koperasi PGRI Sanggam Barintak</title><link rel="icon" href="logo.png">
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Public+Sans:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="app.css"></head><body>
-<header class="top"><div style="max-width:1080px;margin:0 auto"><h1>Ruang kerja pengurus</h1><p id="who">Masuk untuk mengelola data koperasi.</p>
-<nav id="nav" class="hide" role="tablist"><button role="tab" data-t="ringkasan" aria-selected="true">Ringkasan</button><button role="tab" data-t="anggota" aria-selected="false">Anggota</button><button role="tab" data-t="impor" aria-selected="false">Impor Excel</button><button role="tab" data-t="pengguna" aria-selected="false">Pengguna</button><button id="out" role="tab" aria-selected="false">Keluar</button></nav></div></header>
+<header class="top"><div style="max-width:1120px;margin:0 auto">
+<div class="brand"><img class="logo" src="logo.png" alt="Logo Koperasi"><div><h1>Ruang kerja pengurus</h1><p id="who">Masuk untuk mengelola data koperasi.</p></div></div>
+<nav id="nav" class="hide" role="tablist"><span id="tabs" style="display:contents"></span><button id="out" role="tab" aria-selected="false">Keluar</button></nav></div></header>
 <main>
 <section id="login" class="panel" style="max-width:460px"><h2>Masuk</h2>
 <label for="em">Email</label><input id="em" type="email" autocomplete="username">
 <label for="pw">Kata sandi</label><input id="pw" type="password" autocomplete="current-password">
-<div class="row" style="margin-top:14px"><button class="btn" id="go">Masuk</button></div><div id="lmsg" class="msg err hide"></div></section>
+<div class="row"><button class="btn" id="go">Masuk</button></div><div id="lmsg" class="msg err hide"></div></section>
+
 <section id="ringkasan" class="hide"><div class="stats" id="stats"></div></section>
-<section id="anggota" class="hide"><div class="panel scroll"><table><thead><tr><th class="n">No</th><th>Nama</th><th>Instansi</th><th>Tgl daftar</th><th>Status</th></tr></thead><tbody id="ab"></tbody></table></div></section>
-<section id="impor" class="hide"><div class="panel"><h2>Impor dari LAPORAN PEMBUKUAN KOPERASI PGRI.xlsx</h2>
-<p>Membaca sheet <b>SIMPANAN ANGGOTA</b>. Impor ulang aman: data dengan nomor yang sama diperbarui, bukan digandakan.</p>
-<input type="file" id="f" accept=".xlsx"><div class="row" style="margin-top:12px"><button class="btn" id="imp">Impor sekarang</button></div><div id="imsg" class="msg hide"></div></div></section>
+
+<section id="anggota" class="hide">
+<div id="a_form" class="panel hide"><h2>Tambah anggota</h2><div class="fg">
+<div><label for="a_nama">Nama (dengan gelar)</label><input id="a_nama"></div><div><label for="a_inst">Instansi / sekolah</label><input id="a_inst"></div>
+<div><label for="a_npa">NPA PGRI</label><input id="a_npa"></div><div><label for="a_hp">No HP</label><input id="a_hp"></div></div>
+<div class="row"><button class="btn" id="a_save">Simpan anggota</button></div><div id="a_msg" class="msg hide"></div></div>
+<div class="panel scroll"><table><thead><tr><th class="n">No</th><th>Nama</th><th>Instansi</th><th>NPA</th><th>HP</th><th>Tgl daftar</th><th>Status</th></tr></thead><tbody id="ab"></tbody></table></div></section>
+
+<section id="simpanan" class="hide">
+<div id="s_form" class="panel hide"><h2>Catat setoran simpanan</h2><p style="margin:6px 0 0;color:var(--muted)">Setoran otomatis tercatat di Buku kas (kode SIM) dan memperbarui total di portal publik.</p><div class="fg">
+<div><label for="s_ang">Anggota</label><select id="s_ang"></select></div>
+<div><label for="s_jenis">Jenis simpanan</label><select id="s_jenis"><option value="wajib">Wajib</option><option value="pokok">Pokok</option><option value="sukarela">Sukarela</option></select></div>
+<div id="s_perwrap"><label for="s_per">Untuk bulan</label><input id="s_per" type="month"></div>
+<div><label for="s_jml">Jumlah (Rp)</label><input id="s_jml" type="number" min="0" value="50000"></div>
+<div><label for="s_tgl">Tanggal setor</label><input id="s_tgl" type="date"></div></div>
+<div class="row"><button class="btn" id="s_save">Simpan setoran</button></div><div id="s_msg" class="msg hide"></div></div>
+<div class="panel"><div class="row noprint" style="margin-top:0"><input id="s_cari" type="search" placeholder="Cari nama atau sekolah" style="max-width:340px"><button class="btn ghost" id="s_xls">Unduh Excel</button><button class="btn ghost" onclick="print()">Cetak</button></div>
+<div class="scroll" style="margin-top:12px"><table><thead><tr><th class="n">No</th><th>Nama</th><th>Instansi</th><th class="n">Pokok</th><th class="n">Wajib</th><th class="n">Sukarela</th><th class="n">Total</th></tr></thead><tbody id="sb"></tbody><tfoot id="sf"></tfoot></table></div></div></section>
+
+<section id="bku" class="hide">
+<div id="b_form" class="panel hide"><h2>Catat transaksi kas</h2><div class="fg">
+<div><label for="b_tgl">Tanggal</label><input id="b_tgl" type="date"></div>
+<div><label for="b_kode">Kode</label><select id="b_kode"><option>PEND</option><option>BIAYA</option><option>PINJ</option><option>LAIN</option></select></div>
+<div><label for="b_arah">Arah</label><select id="b_arah"><option value="masuk">Uang masuk (kredit)</option><option value="keluar">Uang keluar (debit)</option></select></div>
+<div><label for="b_jml">Jumlah (Rp)</label><input id="b_jml" type="number" min="0"></div></div>
+<label for="b_ket">Keterangan</label><input id="b_ket">
+<div class="row"><button class="btn" id="b_save">Simpan transaksi</button></div><div id="b_msg" class="msg hide"></div></div>
+<div class="panel"><div class="row noprint" style="margin-top:0"><button class="btn ghost" id="b_xls">Unduh Excel</button><button class="btn ghost" onclick="print()">Cetak</button></div>
+<div class="scroll" style="margin-top:12px"><table><thead><tr><th class="n">No</th><th>Tanggal</th><th>Kode</th><th>Keterangan</th><th class="n">Masuk (kredit)</th><th class="n">Keluar (debit)</th><th class="n">Saldo</th></tr></thead><tbody id="bb"></tbody><tfoot id="bf"></tfoot></table></div></div></section>
+
+<section id="surat" class="hide">
+<div id="r_form" class="panel hide"><h2>Catat surat</h2><div class="fg">
+<div><label for="r_jenis">Jenis</label><select id="r_jenis"><option value="keluar">Surat keluar</option><option value="masuk">Surat masuk</option></select></div>
+<div><label for="r_tgl">Tanggal</label><input id="r_tgl" type="date"></div>
+<div><label for="r_nomor">Nomor surat</label><input id="r_nomor"></div>
+<div><label for="r_pihak" id="r_pl">Tujuan</label><input id="r_pihak"></div></div>
+<label for="r_hal">Perihal</label><input id="r_hal"><label for="r_url">Tautan berkas (opsional, mis. Google Drive)</label><input id="r_url" type="url">
+<div class="row"><button class="btn" id="r_save">Simpan surat</button></div><div id="r_msg" class="msg hide"></div></div>
+<div class="panel"><div class="row noprint" style="margin-top:0"><select id="r_f" style="max-width:200px"><option value="">Semua surat</option><option value="masuk">Surat masuk</option><option value="keluar">Surat keluar</option></select></div>
+<div class="scroll" style="margin-top:12px"><table><thead><tr><th>Tanggal</th><th>Jenis</th><th>Nomor</th><th>Asal / tujuan</th><th>Perihal</th><th>Berkas</th></tr></thead><tbody id="rb"></tbody></table></div></div></section>
+
+<section id="shu" class="hide">
+<div class="panel"><h2>Perhitungan SHU</h2><p style="color:var(--muted);margin:6px 0 0">Seluruh persentase dihitung dari <b>laba bersih</b> tahun buku. Cadangan 40% masuk kas cadangan koperasi, lima pos lainnya dibagikan.</p>
+<div class="fg"><div><label for="h_thn">Tahun buku</label><input id="h_thn" type="number"></div><div><label for="h_laba">Laba bersih (Rp)</label><input id="h_laba" type="number" min="0"></div></div>
+<label for="h_pen">Penerima bagian pengurus & pengawas (satu nama per baris, dibagi rata)</label><textarea id="h_pen"></textarea>
+<div id="h_msg" class="msg hide"></div></div>
+<div class="stats" id="h_cards"></div>
+<div class="panel"><div class="row noprint" style="margin-top:0"><button class="btn" id="h_save">Simpan perhitungan</button><button class="btn ghost" id="h_xls">Unduh Excel</button><button class="btn ghost" onclick="print()">Cetak</button></div><div id="h_note"></div>
+<div class="scroll" style="margin-top:12px"><table><thead><tr><th>Anggota</th><th class="n">Simpanan sukarela</th><th class="n">Transaksi dengan koperasi (isi)</th><th class="n">SHU sukarela</th><th class="n">SHU transaksi</th><th class="n">SHU anggota</th><th class="n">Total</th></tr></thead><tbody id="hb"></tbody><tfoot id="hf"></tfoot></table></div></div></section>
+
+<section id="impor" class="hide"><div class="panel"><h2>Impor dari Excel</h2>
+<p>Gunakan file contoh agar kolomnya sesuai: <a href="TEMPLATE_IMPOR_KOPERASI.xlsx" download>unduh TEMPLATE_IMPOR_KOPERASI.xlsx</a>. Hapus baris contoh sebelum mengimpor.</p>
+<p>Sheet <b>SIMPANAN ANGGOTA</b> mengisi anggota dan simpanan. Sheet <b>BKU</b> mengisi buku kas. Impor ulang aman: data bernomor sama diperbarui, bukan digandakan.</p>
+<input type="file" id="f" accept=".xlsx"><div class="row"><button class="btn" id="imp">Impor sekarang</button></div><div id="imsg" class="msg hide"></div></div></section>
+
 <section id="pengguna" class="hide">
 <div class="panel"><h2 id="ftitle">Tambah akun</h2>
-<label for="u_nama">Nama</label><input id="u_nama">
-<label for="u_jab">Jabatan</label><select id="u_jab"><option value="ketua">Ketua</option><option value="sekretaris">Sekretaris</option><option value="bendahara">Bendahara</option><option value="pengawas">Pengawas</option><option value="lainnya">Lainnya</option></select>
-<label for="u_email">Email</label><input id="u_email" type="email">
-<div id="pwwrap"><label for="u_pw">Kata sandi awal (minimal 12 karakter, ada huruf besar, kecil, dan angka)</label><input id="u_pw" type="password" autocomplete="new-password"></div>
+<div class="fg"><div><label for="u_nama">Nama</label><input id="u_nama"></div>
+<div><label for="u_jab">Jabatan</label><select id="u_jab"><option value="ketua">Ketua</option><option value="sekretaris">Sekretaris</option><option value="bendahara">Bendahara</option><option value="pengawas">Pengawas</option><option value="lainnya">Lainnya</option></select></div>
+<div><label for="u_email">Email</label><input id="u_email" type="email"></div>
+<div id="pwwrap"><label for="u_pw">Kata sandi awal (min. 12 karakter, huruf besar, kecil, angka)</label><input id="u_pw" type="password" autocomplete="new-password"></div></div>
 <label>Hak akses</label><div class="scroll"><table id="izin"></table></div>
-<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="u_aktif" checked style="width:auto"> Akun aktif</label>
-<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="u_master" style="width:auto"> Jadikan master admin (boleh mengatur akun dan memiliki semua hak akses)</label>
-<div class="row" style="margin-top:14px"><button class="btn" id="u_save">Simpan akun</button><button class="btn ghost" id="u_reset">Batal</button><button class="btn ghost hide" id="u_mail">Kirim email atur ulang kata sandi</button></div>
+<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="u_aktif" checked> Akun aktif</label>
+<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="u_master"> Jadikan master admin (boleh mengatur akun dan memiliki semua hak akses)</label>
+<div class="row"><button class="btn" id="u_save">Simpan akun</button><button class="btn ghost" id="u_reset">Batal</button><button class="btn ghost hide" id="u_mail">Kirim email atur ulang kata sandi</button></div>
 <div id="u_msg" class="msg hide"></div></div>
-<div class="panel scroll"><h2 style="margin-bottom:10px">Daftar akun</h2><table><thead><tr><th>Nama</th><th>Jabatan</th><th>Email</th><th>Status</th><th>Hak akses</th><th></th></tr></thead><tbody id="ub"></tbody></table></div>
-</section>
+<div class="panel scroll"><h2 style="margin-bottom:10px">Daftar akun</h2><table><thead><tr><th>Nama</th><th>Jabatan</th><th>Email</th><th>Status</th><th>Hak akses</th><th></th></tr></thead><tbody id="ub"></tbody></table></div></section>
+
+<section id="log" class="hide"><div class="panel scroll"><h2 style="margin-bottom:10px">Log aktivitas (100 terbaru)</h2><table><thead><tr><th>Waktu</th><th>Pengguna</th><th>Aksi</th><th>Rincian</th></tr></thead><tbody id="lb"></tbody></table></div></section>
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script type="module" src="admin.js"></script></body></html>
