@@ -12,7 +12,7 @@
 <main>
 <section id="anggota">
 <div class="stats" id="stats"></div>
-<div class="panel"><div class="row" style="margin-top:0"><label for="cari" style="margin:0">Cari nama atau sekolah</label><input id="cari" type="search" placeholder="mis. SMPN 1 Sambaliung" style="max-width:420px"></div>
+<div class="panel"><div class="row" style="margin-top:0"><label for="cari" style="margin:0">Cari nama anggota</label><input id="cari" type="search" placeholder="Ketik minimal 3 huruf nama" autocomplete="off" style="max-width:420px"></div>
 <div class="scroll" style="margin-top:12px"><table><thead><tr><th class="n">No</th><th>Nama</th><th>Instansi</th><th class="n">Pokok</th><th class="n">Wajib</th><th class="n">Sukarela</th><th class="n">Total</th></tr></thead><tbody id="tb"><tr><td colspan="7">Memuat data…</td></tr></tbody><tfoot id="tf"></tfoot></table></div></div>
 </section>
 <section id="pengurus" class="hide"><div class="panel"><h2>Pengurus</h2><div class="people" id="p1" style="margin-top:12px"></div></div>
@@ -33,10 +33,10 @@ const PENGAWAS=[["Hj. Mardiatul Idalisah, S.Pd., M.M.","Ketua Pengawas"],["Musta
 const card=l=>l.map(([n,j])=>`<div class="person"><b>${esc(n)}</b><small>${esc(j)}</small></div>`).join("");
 $("#p1").innerHTML=card(PENGURUS);$("#p2").innerHTML=card(PENGAWAS);
 let rows=[];
-function draw(){const q=$("#cari").value.toLowerCase();const r=rows.filter(a=>(a.nama+" "+a.instansi).toLowerCase().includes(q));
- $("#tb").innerHTML=r.length?r.map((a,i)=>`<tr><td class="n">${i+1}</td><td>${esc(a.nama)}</td><td>${esc(a.instansi)}</td><td class="n">${rp(a.pokok)}</td><td class="n">${rp(a.wajib)}</td><td class="n">${rp(a.sukarela)}</td><td class="n">${rp(a.total)}</td></tr>`).join(""):`<tr><td colspan="7">Tidak ada anggota yang cocok.</td></tr>`;
- const s=k=>r.reduce((t,a)=>t+(a[k]||0),0);
- $("#tf").innerHTML=`<tr><td></td><td colspan="2">Jumlah (${r.length} anggota)</td><td class="n">${rp(s("pokok"))}</td><td class="n">${rp(s("wajib"))}</td><td class="n">${rp(s("sukarela"))}</td><td class="n">${rp(s("total"))}</td></tr>`}
+function draw(){const q=$("#cari").value.trim().toLowerCase();$("#tf").innerHTML="";
+ if(q.length<3){$("#tb").innerHTML=`<tr><td colspan="7" class="msg">Data anggota tidak ditampilkan secara terbuka. Ketik minimal 3 huruf nama anggota pada kolom pencarian untuk melihat simpanannya.</td></tr>`;return}
+ const r=rows.filter(a=>(a.nama||"").toLowerCase().includes(q)).slice(0,10);
+ $("#tb").innerHTML=r.length?r.map((a,i)=>`<tr><td class="n">${a.no||i+1}</td><td>${esc(a.nama)}</td><td>${esc(a.instansi)}</td><td class="n">${rp(a.pokok)}</td><td class="n">${rp(a.wajib)}</td><td class="n">${rp(a.sukarela)}</td><td class="n">${rp(a.total)}</td></tr>`).join(""):`<tr><td colspan="7">Tidak ada anggota dengan nama tersebut.</td></tr>`}
 $("#cari").oninput=draw;
 try{const snap=await getDocs(collection(db,"publik_anggota"));
  rows=snap.docs.map(d=>d.data()).sort((a,b)=>(a.no||0)-(b.no||0));
