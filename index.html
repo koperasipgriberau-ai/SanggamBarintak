@@ -21,7 +21,7 @@
 <footer>Simpanan pokok Rp500.000 · simpanan wajib Rp50.000 per bulan · simpanan sukarela maksimal Rp15.000.000</footer>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getFirestore,collection,getDocs} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getFirestore,collection,getDocs,getDoc,doc} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {firebaseConfig} from "./firebase-config.js";
 const db=getFirestore(initializeApp(firebaseConfig));
 const $=s=>document.querySelector(s), rp=n=>"Rp"+(n||0).toLocaleString("id-ID");
@@ -32,13 +32,24 @@ const PENGURUS=[["Marsono","Ketua"],["Ika Novita Mulia","Sekretaris"],["Eli Sutr
 const PENGAWAS=[["Hj. Mardiatul Idalisah, S.Pd., M.M.","Ketua Pengawas"],["Mustaring, S.Pd., M.Pd.","Anggota Pengawas"],["Dr. H. Saleh, S.T., M.Pd.","Anggota Pengawas"]];
 const card=l=>l.map(([n,j])=>`<div class="person"><b>${esc(n)}</b><small>${esc(j)}</small></div>`).join("");
 $("#p1").innerHTML=card(PENGURUS);$("#p2").innerHTML=card(PENGAWAS);
-let rows=[];
-function draw(){const q=$("#cari").value.trim().toLowerCase();$("#tf").innerHTML="";
+let rows=[],DIBAGI=[];
+$("#tb").closest("table").parentElement.insertAdjacentHTML("afterend",'<div id="detail"></div>');
+const BLN=["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"],BLNF=["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"],WAJIB=50000,JT=10;
+function detail(a){if(!a.wajibBulan)return `<div class="msg"><b>${esc(a.nama)}</b>: rekap simpanan wajib bulanan belum tersedia. Hubungi pengurus koperasi.</div>`;
+ const n=new Date(),cy=n.getFullYear(),paid=new Set(a.wajibBulan),tg=a.daftar||"",ty=tg?+tg.slice(0,4):0,tung=[];let grid="";
+ for(const y of [cy-1,cy]){if(DIBAGI.includes(y))continue;const due=y<cy?12:n.getMonth()+(n.getDate()>=JT?1:0),mulai=ty>y?13:ty===y?+tg.slice(5,7):1,cells=[],tg2=[];
+  for(let m=1;m<=12;m++){if(paid.has(`${y}-${String(m).padStart(2,"0")}`))cells.push("✓");else if(m<mulai||m>due)cells.push("-");else{cells.push("✗");tg2.push(BLNF[m-1]+" "+y)}}
+  if(y<cy&&!tg2.length)continue;if(y<cy&&!cells.includes("✓"))continue;tung.push(...tg2);
+  grid+=`<p style="margin:10px 0 4px"><b>Simpanan wajib bulanan tahun ${y}</b> (${rp(WAJIB)} per bulan)</p><div style="overflow-x:auto"><table><thead><tr>${BLN.map(b=>`<th style="text-align:center">${b}</th>`).join("")}</tr></thead><tbody><tr>${cells.map(c=>`<td style="text-align:center;${c==="✗"?"color:#b3261e;font-weight:700":c==="-"?"color:#999":""}">${c}</td>`).join("")}</tr></tbody></table></div><small>✓ sudah tercatat · ✗ belum tercatat (menunggak) · - belum jatuh tempo / belum menjadi anggota</small>`}
+ const ban=tung.length?`<div class="msg err"><b>Perhatian:</b> ada simpanan wajib yang belum tercatat: ${tung.map(esc).join(", ")} (${tung.length} bulan × ${rp(WAJIB)} = <b>${rp(tung.length*WAJIB)}</b>). Mohon ditunaikan, atau hubungi pengurus bila sudah membayar.</div>`:`<div class="msg">Tidak ada tunggakan simpanan wajib.</div>`;
+ return `<div style="margin-top:14px"><h3 style="margin:0 0 6px">${esc(a.nama)}</h3>${ban}${grid}</div>`}
+function draw(){const q=$("#cari").value.trim().toLowerCase();$("#tf").innerHTML="";$("#detail").innerHTML="";
  if(q.length<3){$("#tb").innerHTML=`<tr><td colspan="7" class="msg">Data anggota tidak ditampilkan secara terbuka. Ketik minimal 3 huruf nama anggota pada kolom pencarian untuk melihat simpanannya.</td></tr>`;return}
  const r=rows.filter(a=>(a.nama||"").toLowerCase().includes(q)).slice(0,10);
- $("#tb").innerHTML=r.length?r.map((a,i)=>`<tr><td class="n">${a.no||i+1}</td><td>${esc(a.nama)}</td><td>${esc(a.instansi)}</td><td class="n">${rp(a.pokok)}</td><td class="n">${rp(a.wajib)}</td><td class="n">${rp(a.sukarela)}</td><td class="n">${rp(a.total)}</td></tr>`).join(""):`<tr><td colspan="7">Tidak ada anggota dengan nama tersebut.</td></tr>`}
+ $("#tb").innerHTML=r.length?r.map((a,i)=>`<tr><td class="n">${a.no||i+1}</td><td>${esc(a.nama)}</td><td>${esc(a.instansi)}</td><td class="n">${rp(a.pokok)}</td><td class="n">${rp(a.wajib)}</td><td class="n">${rp(a.sukarela)}</td><td class="n">${rp(a.total)}</td></tr>`).join(""):`<tr><td colspan="7">Tidak ada anggota dengan nama tersebut.</td></tr>`;$("#detail").innerHTML=r.map(detail).join("")}
 $("#cari").oninput=draw;
-try{const snap=await getDocs(collection(db,"publik_anggota"));
+try{try{const rs=await getDoc(doc(db,"publik_ringkasan","utama"));DIBAGI=(rs.data()?.tahunDibagi||[]).map(Number)}catch(e){}
+const snap=await getDocs(collection(db,"publik_anggota"));
  rows=snap.docs.map(d=>d.data()).sort((a,b)=>(a.no||0)-(b.no||0));
  const t=rows.reduce((s,a)=>s+(a.total||0),0);
  $("#stats").innerHTML=`<div class="stat"><b>${rows.length}</b><span>anggota terdaftar</span></div><div class="stat"><b>${rp(t)}</b><span>total simpanan anggota</span></div>`;

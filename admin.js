@@ -91,10 +91,11 @@ onAuthStateChanged(auth,async u=>{
 async function syncRingkasan(){await getAnggota();const aktif=new Set(ANG.filter(a=>a.status!=="berhenti").map(a=>a.id));
  const all=await getDocs(collection(db,"simpanan")),g={pokok:0,wajib:0,sukarela:0};all.forEach(d=>{const x=d.data();if(aktif.has(x.anggotaId))g[x.jenis]+=x.jumlah});
  await setDoc(doc(db,"publik_ringkasan","utama"),{jumlahAnggota:aktif.size,...g,diperbarui:new Date().toISOString()},{merge:true})}
+const pubW=(a,L)=>({wajibBulan:[...new Set(L.filter(x=>x.jenis==="wajib"&&x.periode).map(x=>x.periode))].sort(),daftar:(a.tglDaftar||"").slice(0,7)});
 async function syncPublik(id){const a=(await getAnggota()).find(x=>x.id===id);if(!a)return;
  if(a.status==="berhenti"){await deleteDoc(doc(db,"publik_anggota",id))}
  else{const q=await getDocs(query(collection(db,"simpanan"),where("anggotaId","==",id))),t={pokok:0,wajib:0,sukarela:0};q.forEach(d=>{const x=d.data();t[x.jenis]+=x.jumlah});
-  await setDoc(doc(db,"publik_anggota",id),{no:a.no,nama:a.nama,instansi:a.instansi||"",...t,total:t.pokok+t.wajib+t.sukarela},{merge:true})}
+  await setDoc(doc(db,"publik_anggota",id),{no:a.no,nama:a.nama,instansi:a.instansi||"",...t,total:t.pokok+t.wajib+t.sukarela,...pubW(a,q.docs.map(d=>d.data()))},{merge:true})}
  await syncRingkasan()}
 
 // ---------- Tunggakan (dipakai juga oleh Ringkasan) ----------
@@ -308,10 +309,10 @@ const slipPeng=(o,th)=>`<section style="page-break-after:always;font:14px/1.5 sy
 const slipDoc=(rows,th,peng=[])=>`<!doctype html><meta charset="utf-8"><title>Slip SHU tahun buku ${th}</title><style>@media print{.np{display:none}}</style><div class="np" style="text-align:center;margin:12px"><button onclick="print()">Cetak / simpan PDF</button></div>`+rows.map(r=>slipHtml(r,th)).join("")+peng.map(o=>slipPeng(o,th)).join("");
 $("#hb").onclick=e=>{const b=e.target.closest("[data-slip]");if(!b)return;const r=SHUROWS.find(x=>x.id===b.dataset.slip);if(r)window.open(URL.createObjectURL(new Blob([slipDoc([r],thSHU())],{type:"text/html"})),"_blank")};
 $("#h_slip").onclick=()=>{const th=thSHU(),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([slipDoc(SHUROWS,th,PENG)],{type:"text/html"}));a.download=`slip-SHU-tahun-buku-${th}.html`;a.click()};
-async function syncSemua(){await getAnggota(true);const s=await getDocs(collection(db,"simpanan")),t={};s.forEach(d=>{const x=d.data();(t[x.anggotaId]??={pokok:0,wajib:0,sukarela:0})[x.jenis]+=x.jumlah});
+async function syncSemua(){await getAnggota(true);await muatTB().catch(()=>{});const W={};const s=await getDocs(collection(db,"simpanan")),t={};s.forEach(d=>{const x=d.data();(W[x.anggotaId]??=[]).push(x);(t[x.anggotaId]??={pokok:0,wajib:0,sukarela:0})[x.jenis]+=x.jumlah});
  const aktif=ANG.filter(a=>a.status!=="berhenti"),g={pokok:0,wajib:0,sukarela:0};
- for(let i=0;i<aktif.length;i+=400){const b=writeBatch(db);aktif.slice(i,i+400).forEach(a=>{const x=t[a.id]||{pokok:0,wajib:0,sukarela:0};for(const k in g)g[k]+=x[k];b.set(doc(db,"publik_anggota",a.id),{no:a.no,nama:a.nama,instansi:a.instansi||"",...x,total:x.pokok+x.wajib+x.sukarela},{merge:true})});await b.commit()}
- await setDoc(doc(db,"publik_ringkasan","utama"),{jumlahAnggota:aktif.length,...g,diperbarui:new Date().toISOString()},{merge:true})}
+ for(let i=0;i<aktif.length;i+=400){const b=writeBatch(db);aktif.slice(i,i+400).forEach(a=>{const x=t[a.id]||{pokok:0,wajib:0,sukarela:0};for(const k in g)g[k]+=x[k];b.set(doc(db,"publik_anggota",a.id),{no:a.no,nama:a.nama,instansi:a.instansi||"",...x,total:x.pokok+x.wajib+x.sukarela,...pubW(a,W[a.id]||[])},{merge:true})});await b.commit()}
+ await setDoc(doc(db,"publik_ringkasan","utama"),{jumlahAnggota:aktif.length,...g,tahunDibagi:Object.keys(TBD).filter(y=>TBD[y].dibagi).map(Number),diperbarui:new Date().toISOString()},{merge:true})}
 $("#h_bagi").onclick=async()=>{const th=thSHU(),m=$("#h_msg");
  try{const lama=await getDoc(doc(db,"shu",String(th)));await muatTB();
   if(!TBD[th])return msg(m,`Tutup tahun buku ${th} dulu di menu Tutup buku.`,true);if(!lama.exists())return msg(m,"Simpan perhitungan SHU dulu.",true);if(lama.data().dibagi)return msg(m,"SHU tahun ini sudah dibagikan.",true);
@@ -336,13 +337,13 @@ $("#imp").onclick=async()=>{const m=$("#imsg"),file=$("#f").files[0];if(!file){m
   if(!wsS&&!wsB)throw new Error('Sheet "SIMPANAN ANGGOTA" atau "BKU" tidak ditemukan');
   const ops=[],TAHUN=2026;let nA=0,nB=0;
   if(wsS){const rows=XLSX.utils.sheet_to_json(wsS,{header:1,defval:null}).filter(r=>typeof r[0]==="number"&&typeof r[2]==="string"&&r[2].trim());const tot={pokok:0,wajib:0,sukarela:0};
-   for(const r of rows){const no=r[0],id="A"+String(no).padStart(3,"0"),tgl=r[1] instanceof Date?ymd(r[1]):"",pokok=+r[4]||0,suk=+r[5]||0;let wajib=0;
+   for(const r of rows){const no=r[0],id="A"+String(no).padStart(3,"0"),tgl=r[1] instanceof Date?ymd(r[1]):"",pokok=+r[4]||0,suk=+r[5]||0;let wajib=0;const wb=[];
     ops.push([doc(db,"anggota",id),{no,nama:r[2].trim(),instansi:(r[3]||"").trim(),tglDaftar:tgl}]);
     if(pokok)ops.push([doc(db,"simpanan",id+"_pokok"),{anggotaId:id,jenis:"pokok",jumlah:pokok,tanggal:tgl}]);
     if(suk)ops.push([doc(db,"simpanan",id+"_sukarela"),{anggotaId:id,jenis:"sukarela",jumlah:suk,tanggal:tgl}]);
-    for(let b=0;b<12;b++){const v=+r[6+b]||0;if(v){wajib+=v;ops.push([doc(db,"simpanan",`${id}_wajib_${TAHUN}_${String(b+1).padStart(2,"0")}`),{anggotaId:id,jenis:"wajib",jumlah:v,periode:`${TAHUN}-${String(b+1).padStart(2,"0")}`}])}}
+    for(let b=0;b<12;b++){const v=+r[6+b]||0;if(v){wajib+=v;wb.push(`${TAHUN}-${String(b+1).padStart(2,"0")}`);ops.push([doc(db,"simpanan",`${id}_wajib_${TAHUN}_${String(b+1).padStart(2,"0")}`),{anggotaId:id,jenis:"wajib",jumlah:v,periode:`${TAHUN}-${String(b+1).padStart(2,"0")}`}])}}
     tot.pokok+=pokok;tot.wajib+=wajib;tot.sukarela+=suk;
-    ops.push([doc(db,"publik_anggota",id),{no,nama:r[2].trim(),instansi:(r[3]||"").trim(),pokok,wajib,sukarela:suk,total:pokok+wajib+suk}])}
+    ops.push([doc(db,"publik_anggota",id),{no,nama:r[2].trim(),instansi:(r[3]||"").trim(),pokok,wajib,sukarela:suk,total:pokok+wajib+suk,wajibBulan:wb,daftar:tgl.slice(0,7)}])}
    ops.push([doc(db,"publik_ringkasan","utama"),{jumlahAnggota:rows.length,...tot,diperbarui:new Date().toISOString()}]);nA=rows.length}
   if(wsB&&can("bku","ubah")){const rows=XLSX.utils.sheet_to_json(wsB,{header:1,defval:null}).filter(r=>typeof r[0]==="number"&&r[1] instanceof Date&&typeof r[3]==="string");
    for(const r of rows)ops.push([doc(db,"bku","B"+String(r[0]).padStart(4,"0")),{tanggal:ymd(r[1]),kode:String(r[2]||"").trim().toUpperCase(),keterangan:r[3].trim(),kredit:+r[4]||0,debit:+r[5]||0,urut:r[0]}]);nB=rows.length}
@@ -475,3 +476,8 @@ function renderPeng(tot,pen){PENG=pen.map(l=>{const p=persenPeng(l);return {nama
  $("#h_peng").innerHTML=`<h3 style="margin:8px 0">Pembagian pengurus & pengawas (${rp(tot)})</h3><table><thead><tr><th>Nama / jabatan</th><th class="n">Persen</th><th class="n">Jumlah</th><th>Slip</th></tr></thead><tbody>${PENG.map((o,i)=>`<tr><td>${esc(o.nama)}</td><td class="n">${o.persen}%</td><td class="n">${rp(o.jumlah)}</td><td><button class="btn ghost sm" data-pslip="${i}">Slip</button></td></tr>`).join("")}<tr style="font-weight:700"><td>Jumlah</td><td class="n">${sp}%</td><td class="n">${rp(PENG.reduce((t,o)=>t+o.jumlah,0))}</td><td></td></tr></tbody></table>`;
  return pen.length&&Math.abs(sp-100)>0.01?`Total persen pengurus & pengawas ${sp}%, seharusnya 100%.`:""}
 $("#h_peng").onclick=e=>{const b=e.target.closest("[data-pslip]");if(!b)return;const o=PENG[+b.dataset.pslip];if(o)window.open(URL.createObjectURL(new Blob([slipDoc([],thSHU(),[o])],{type:"text/html"})),"_blank")};
+
+// ---------- Sinkron data portal anggota ----------
+$("#t_cards").insertAdjacentHTML("beforebegin",'<div class="row noprint"><button class="btn ghost" id="t_pub">Perbarui data portal anggota (rekap wajib bulanan & tunggakan)</button></div><div id="t_pubmsg" class="msg hide"></div>');
+$("#t_pub").classList.toggle("hide",false);
+$("#t_pub").onclick=async()=>{const m=$("#t_pubmsg");if(!(can("simpanan","ubah")||can("anggota","ubah")))return msg(m,"Butuh hak ubah Simpanan atau Anggota.",true);msg(m,"Memperbarui…");try{await syncSemua();msg(m,"Data portal anggota diperbarui.")}catch(e){msg(m,"Gagal: "+e.message,true)}};
