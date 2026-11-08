@@ -1,8 +1,10 @@
-// Ganti dengan konfigurasi dari Firebase Console > Project settings > Your apps > Web app.
+// Konfigurasi Firebase untuk Koperasi PGRI Sanggam Barintak.
 // Kunci ini memang tampil publik; keamanan data dijaga oleh firestore.rules.
 export const firebaseConfig = {
-  apiKey: "GANTI_DENGAN_API_KEY",
-  authDomain: "NAMA-PROYEK.firebaseapp.com",
-  projectId: "NAMA-PROYEK",
-  appId: "GANTI_DENGAN_APP_ID"
+  apiKey: "AIzaSyBjykcchnC4eIWIgVzb4AcrpsQtlhhEzWo",
+  authDomain: "koperasi-pgri-sb.firebaseapp.com",
+  projectId: "koperasi-pgri-sb",
+  storageBucket: "koperasi-pgri-sb.firebasestorage.app",
+  messagingSenderId: "651343251596",
+  appId: "1:651343251596:web:4109103fed100f7a8553a9"
 };
