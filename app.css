@@ -39,3 +39,9 @@ label{display:block;margin:12px 0 4px;font-weight:600}
 .hide{display:none!important}
 footer{text-align:center;color:var(--muted);font-size:.85rem;padding:20px}
 @media print{header nav,.noprint,.btn{display:none!important}body{background:#fff;color:#000}header.top{background:#fff;color:#000}.panel{border:0}}
+
+.sm{padding:4px 9px;font-size:.85rem;text-decoration:none;display:inline-block}
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);padding:20px;width:min(580px,94vw);max-height:92vh;overflow:auto}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.warn{border-left:4px solid var(--gold);background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--gold);padding:10px 14px;border-radius:6px;margin-bottom:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.bad{color:var(--bad)}.dim{color:var(--muted)}

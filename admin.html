@@ -13,14 +13,14 @@
 <label for="pw">Kata sandi</label><input id="pw" type="password" autocomplete="current-password">
 <div class="row"><button class="btn" id="go">Masuk</button></div><div id="lmsg" class="msg err hide"></div></section>
 
-<section id="ringkasan" class="hide"><div class="stats" id="stats"></div></section>
+<section id="ringkasan" class="hide"><div id="r_warn"></div><div class="stats" id="stats"></div></section>
 
 <section id="anggota" class="hide">
 <div id="a_form" class="panel hide"><h2>Tambah anggota</h2><div class="fg">
 <div><label for="a_nama">Nama (dengan gelar)</label><input id="a_nama"></div><div><label for="a_inst">Instansi / sekolah</label><input id="a_inst"></div>
 <div><label for="a_npa">NPA PGRI</label><input id="a_npa"></div><div><label for="a_hp">No HP</label><input id="a_hp"></div></div>
 <div class="row"><button class="btn" id="a_save">Simpan anggota</button></div><div id="a_msg" class="msg hide"></div></div>
-<div class="panel scroll"><table><thead><tr><th class="n">No</th><th>Nama</th><th>Instansi</th><th>NPA</th><th>HP</th><th>Tgl daftar</th><th>Status</th></tr></thead><tbody id="ab"></tbody></table></div></section>
+<div class="panel scroll"><table><thead><tr><th class="n">No</th><th>Nama</th><th>Instansi</th><th>NPA</th><th>HP</th><th>Tgl daftar</th><th>Status</th><th></th></tr></thead><tbody id="ab"></tbody></table></div></section>
 
 <section id="simpanan" class="hide">
 <div id="s_form" class="panel hide"><h2>Catat setoran simpanan</h2><p style="margin:6px 0 0;color:var(--muted)">Setoran otomatis tercatat di Buku kas (kode SIM) dan memperbarui total di portal publik.</p><div class="fg">
@@ -31,18 +31,19 @@
 <div><label for="s_tgl">Tanggal setor</label><input id="s_tgl" type="date"></div></div>
 <div class="row"><button class="btn" id="s_save">Simpan setoran</button></div><div id="s_msg" class="msg hide"></div></div>
 <div class="panel"><div class="row noprint" style="margin-top:0"><input id="s_cari" type="search" placeholder="Cari nama atau sekolah" style="max-width:340px"><button class="btn ghost" id="s_xls">Unduh Excel</button><button class="btn ghost" onclick="print()">Cetak</button></div>
-<div class="scroll" style="margin-top:12px"><table><thead><tr><th class="n">No</th><th>Nama</th><th>Instansi</th><th class="n">Pokok</th><th class="n">Wajib</th><th class="n">Sukarela</th><th class="n">Total</th></tr></thead><tbody id="sb"></tbody><tfoot id="sf"></tfoot></table></div></div></section>
+<div class="scroll" style="margin-top:12px"><table><thead><tr><th class="n">No</th><th>Nama</th><th>Instansi</th><th class="n">Pokok</th><th class="n">Wajib</th><th class="n">Sukarela</th><th class="n">Total</th></tr></thead><tbody id="sb"></tbody><tfoot id="sf"></tfoot></table></div></div>
+<div class="panel"><h2>Daftar setoran</h2><p style="color:var(--muted);margin:4px 0 0">Gunakan Ubah atau Hapus bila ada kekeliruan. Setiap perubahan tercatat di riwayat beserta nama akun dan alasannya.</p><div class="row noprint"><select id="s_fa" style="max-width:320px"></select></div><div class="scroll" style="margin-top:8px"><table><thead><tr><th>Tanggal</th><th>Anggota</th><th>Jenis</th><th>Bulan</th><th class="n">Jumlah</th><th></th></tr></thead><tbody id="sh"></tbody></table></div></div></section>
 
 <section id="bku" class="hide">
 <div id="b_form" class="panel hide"><h2>Catat transaksi kas</h2><div class="fg">
 <div><label for="b_tgl">Tanggal</label><input id="b_tgl" type="date"></div>
-<div><label for="b_kode">Kode</label><select id="b_kode"><option>PEND</option><option>BIAYA</option><option>PINJ</option><option>LAIN</option></select></div>
+<div><label for="b_kode">Kode</label><select id="b_kode"><option value="SIM">SIM (simpanan)</option><option value="BIA">BIA (biaya lain-lain)</option><option value="CAFE">CAFE (kas cafe)</option><option value="KONVEKSI">KONVEKSI (kas konveksi)</option></select></div>
 <div><label for="b_arah">Arah</label><select id="b_arah"><option value="masuk">Uang masuk (kredit)</option><option value="keluar">Uang keluar (debit)</option></select></div>
 <div><label for="b_jml">Jumlah (Rp)</label><input id="b_jml" type="number" min="0"></div></div>
-<label for="b_ket">Keterangan</label><input id="b_ket">
+<label for="b_ket">Keterangan</label><input id="b_ket"><div id="b_note" class="msg hide">Untuk setoran simpanan, sebaiknya gunakan menu Simpanan agar total anggota ikut terisi. Transaksi SIM yang dicatat di sini akan berstatus "Perlu konfirmasi" sampai dibagi ke pokok, wajib, atau sukarela.</div>
 <div class="row"><button class="btn" id="b_save">Simpan transaksi</button></div><div id="b_msg" class="msg hide"></div></div>
-<div class="panel"><div class="row noprint" style="margin-top:0"><button class="btn ghost" id="b_xls">Unduh Excel</button><button class="btn ghost" onclick="print()">Cetak</button></div>
-<div class="scroll" style="margin-top:12px"><table><thead><tr><th class="n">No</th><th>Tanggal</th><th>Kode</th><th>Keterangan</th><th class="n">Masuk (kredit)</th><th class="n">Keluar (debit)</th><th class="n">Saldo</th></tr></thead><tbody id="bb"></tbody><tfoot id="bf"></tfoot></table></div></div></section>
+<div class="panel"><p style="margin:0 0 8px;color:var(--muted)"><b>Kode:</b> SIM = simpanan (pokok/wajib/sukarela) · BIA = biaya lain-lain · CAFE = kas cafe · KONVEKSI = kas konveksi</p><div id="b_warn"></div><div class="row noprint" style="margin-top:0"><select id="b_fk" style="max-width:220px"></select><button class="btn ghost" id="b_xls">Unduh Excel</button><button class="btn ghost" onclick="print()">Cetak</button></div>
+<div class="scroll" style="margin-top:12px"><table><thead><tr><th class="n">No</th><th>Tanggal</th><th>Kode</th><th>Keterangan</th><th class="n">Masuk (kredit)</th><th class="n">Keluar (debit)</th><th class="n">Saldo</th><th>Status</th><th></th></tr></thead><tbody id="bb"></tbody><tfoot id="bf"></tfoot></table></div></div></section>
 
 <section id="surat" class="hide">
 <div id="r_form" class="panel hide"><h2>Catat surat</h2><div class="fg">
@@ -53,7 +54,15 @@
 <label for="r_hal">Perihal</label><input id="r_hal"><label for="r_url">Tautan berkas (opsional, mis. Google Drive)</label><input id="r_url" type="url">
 <div class="row"><button class="btn" id="r_save">Simpan surat</button></div><div id="r_msg" class="msg hide"></div></div>
 <div class="panel"><div class="row noprint" style="margin-top:0"><select id="r_f" style="max-width:200px"><option value="">Semua surat</option><option value="masuk">Surat masuk</option><option value="keluar">Surat keluar</option></select></div>
-<div class="scroll" style="margin-top:12px"><table><thead><tr><th>Tanggal</th><th>Jenis</th><th>Nomor</th><th>Asal / tujuan</th><th>Perihal</th><th>Berkas</th></tr></thead><tbody id="rb"></tbody></table></div></div></section>
+<div class="scroll" style="margin-top:12px"><table><thead><tr><th>Tanggal</th><th>Jenis</th><th>Nomor</th><th>Asal / tujuan</th><th>Perihal</th><th>Berkas</th><th></th></tr></thead><tbody id="rb"></tbody></table></div></div></section>
+
+<section id="tunggakan" class="hide">
+<div class="panel"><h2>Tunggakan simpanan wajib</h2><p style="color:var(--muted);margin:6px 0 0">Simpanan wajib Rp50.000 per bulan. Bulan dianggap jatuh tempo setelah tanggal yang Anda tentukan.</p>
+<div class="fg"><div><label for="t_thn">Tahun</label><input id="t_thn" type="number"></div><div><label for="t_jt">Jatuh tempo tiap tanggal</label><input id="t_jt" type="number" min="1" max="28"></div></div>
+<div class="row noprint"><button class="btn ghost" id="t_xls">Unduh rekap Excel</button><button class="btn ghost" id="t_copy">Salin pesan untuk grup</button><button class="btn ghost" onclick="print()">Cetak</button></div><div id="t_msg" class="msg hide"></div></div>
+<div class="stats" id="t_cards"></div>
+<div class="panel scroll"><h2 style="margin-bottom:8px">Anggota yang menunggak</h2><table><thead><tr><th class="n">No</th><th>Nama</th><th>Instansi</th><th>HP</th><th>Bulan menunggak</th><th class="n">Bulan</th><th class="n">Nominal</th><th class="noprint">Pengingat</th></tr></thead><tbody id="tb1"></tbody></table></div>
+<div class="panel scroll"><h2 style="margin-bottom:8px">Rekap bulanan semua anggota</h2><p style="color:var(--muted);margin:0 0 8px">✓ sudah bayar · ✗ menunggak · - belum jatuh tempo</p><table><thead id="th2"></thead><tbody id="tb2"></tbody></table></div></section>
 
 <section id="shu" class="hide">
 <div class="panel"><h2>Perhitungan SHU</h2><p style="color:var(--muted);margin:6px 0 0">Seluruh persentase dihitung dari <b>laba bersih</b> tahun buku. Cadangan 40% masuk kas cadangan koperasi, lima pos lainnya dibagikan.</p>
@@ -82,7 +91,9 @@
 <div id="u_msg" class="msg hide"></div></div>
 <div class="panel scroll"><h2 style="margin-bottom:10px">Daftar akun</h2><table><thead><tr><th>Nama</th><th>Jabatan</th><th>Email</th><th>Status</th><th>Hak akses</th><th></th></tr></thead><tbody id="ub"></tbody></table></div></section>
 
-<section id="log" class="hide"><div class="panel scroll"><h2 style="margin-bottom:10px">Log aktivitas (100 terbaru)</h2><table><thead><tr><th>Waktu</th><th>Pengguna</th><th>Aksi</th><th>Rincian</th></tr></thead><tbody id="lb"></tbody></table></div></section>
+<section id="log" class="hide"><div class="panel scroll"><h2 style="margin-bottom:10px">Log aktivitas (200 terbaru)</h2><div class="row noprint" style="margin:0 0 10px"><select id="l_f" style="max-width:240px"><option value="">Semua data</option><option value="anggota">Anggota</option><option value="simpanan">Simpanan</option><option value="bku">Buku kas</option><option value="surat">Surat</option><option value="admins">Akun pengguna</option></select></div><table><thead><tr><th>Waktu</th><th>Pengguna</th><th>Aksi</th><th>Data</th><th>Rincian perubahan</th><th>Alasan</th></tr></thead><tbody id="lb"></tbody></table></div></section>
 </main>
+<dialog id="dlg"><h2 id="dlg_t" style="margin-bottom:6px"></h2><div id="dlg_f"></div><div id="dlg_e" class="msg err hide"></div><div class="row"><button class="btn" id="dlg_ok">Simpan</button><button class="btn ghost" id="dlg_x">Batal</button></div></dialog>
+<dialog id="dlg2"><h2 id="dlg2_t" style="margin-bottom:8px"></h2><div id="dlg2_b" class="scroll"></div><div class="row"><button class="btn" id="dlg2_x">Tutup</button></div></dialog>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script type="module" src="admin.js"></script></body></html>
